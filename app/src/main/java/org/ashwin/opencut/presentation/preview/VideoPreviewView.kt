@@ -23,4 +23,12 @@ class VideoPreviewView(context: Context) : GLSurfaceView(context) {
     fun setEffect(effectSettings: EffectSettings) {
         renderer.setEffect(effectSettings)
     }
+
+    fun togglePlayback() {
+        renderer.togglePlayback()
+    }
+
+    fun isPlaying(): Boolean {
+        return renderer.isPlaying
+    }
 }

@@ -186,4 +186,17 @@ implements GLSurfaceView.Renderer,
         mediaPlayer.setSurface(surface);
     }
 
+    public void togglePlayback() {
+        if (mediaPlayer != null) {
+            if (mediaPlayer.isPlaying()) {
+                mediaPlayer.pause();
+            } else {
+                mediaPlayer.start();
+            }
+        }
+    }
+
+    public boolean isPlaying() {
+        return mediaPlayer != null && mediaPlayer.isPlaying();
+    }
 }
