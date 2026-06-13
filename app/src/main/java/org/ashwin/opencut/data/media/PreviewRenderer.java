@@ -58,7 +58,7 @@ implements GLSurfaceView.Renderer,
 
         surfaceTexture.setOnFrameAvailableListener(this);
 
-        videoShader = new VideoShader();
+        videoShader = new VideoShader(context);
 
         initPlayer();
 

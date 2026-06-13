@@ -186,7 +186,7 @@ public class VideoExporter {
 
         inputSurface.makeCurrent();
 
-        OutputSurface outputSurface = new OutputSurface(eglCore, effects, width, height);
+        OutputSurface outputSurface = new OutputSurface(context, eglCore, effects, width, height);
 
         decoder.configure(inputFormat, outputSurface.getSurface(), null, 0);
 

@@ -1,4 +1,5 @@
 package org.ashwin.opencut.data.media;
+import android.content.Context;
 import android.opengl.GLES20;
 
 import org.ashwin.opencut.domain.model.EffectSettings;
@@ -14,13 +15,15 @@ public class ExportRenderer {
             new float[16];
     private EffectSettings effectSettings;
 
-    public ExportRenderer() {
+    private Context context;
 
+    public ExportRenderer(Context context) {
+        this.context = context;
     }
 
     public void init() {
 
-        shader = new VideoShader();
+        shader = new VideoShader(context);
 
         android.opengl.Matrix.setIdentityM(
                 mvpMatrix,

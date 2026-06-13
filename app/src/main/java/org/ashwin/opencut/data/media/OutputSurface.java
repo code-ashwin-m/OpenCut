@@ -1,5 +1,6 @@
 package org.ashwin.opencut.data.media;
 
+import android.content.Context;
 import android.graphics.SurfaceTexture;
 import android.util.Log;
 import android.view.Surface;
@@ -32,6 +33,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener{
     }
 
     public OutputSurface(
+            Context context,
             EglCore eglCore,
             EffectSettings effects,
             int width,
@@ -50,7 +52,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener{
         surface =
                 new Surface(surfaceTexture);
 
-        renderer = new ExportRenderer();
+        renderer = new ExportRenderer(context);
 
         renderer.init();
 
