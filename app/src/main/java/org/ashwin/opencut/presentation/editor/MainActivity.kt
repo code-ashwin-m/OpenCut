@@ -120,6 +120,8 @@ class MainActivity : ComponentActivity() {
                         onBrightnessChange = { editorViewModel.updateBrightness(it) },
                         onContrastChange = { editorViewModel.updateContrast(it) },
                         onExposureChange = { editorViewModel.updateExposure(it) },
+                        onHighlightsChange = { editorViewModel.updateHighlights(it) },
+                        onShadowsChange = { editorViewModel.updateShadows(it) },
                         onExportVideo = {
                             val outputFile = File(
                                 context.cacheDir,
@@ -146,6 +148,8 @@ fun EditorScreen(
     onBrightnessChange: (Float) -> Unit,
     onContrastChange: (Float) -> Unit,
     onExposureChange: (Float) -> Unit,
+    onHighlightsChange: (Float) -> Unit,
+    onShadowsChange: (Float) -> Unit,
     onExportVideo: () -> Unit,
     onBackClick: () -> Unit,
 ) {
@@ -248,6 +252,34 @@ fun EditorScreen(
                 value = uiState.effectSettings.exposure,
                 onValueChange = onExposureChange,
                 valueRange = -2f..2f,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.size(16.dp))
+
+            Text(
+                text = "Highlights: %.2f".format(uiState.effectSettings.highlights),
+                color = Color.White
+            )
+
+            Slider(
+                value = uiState.effectSettings.highlights,
+                onValueChange = onHighlightsChange,
+                valueRange = -1f..1f,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.size(16.dp))
+
+            Text(
+                text = "Shadows: %.2f".format(uiState.effectSettings.shadows),
+                color = Color.White
+            )
+
+            Slider(
+                value = uiState.effectSettings.shadows,
+                onValueChange = onShadowsChange,
+                valueRange = -1f..1f,
                 modifier = Modifier.fillMaxWidth()
             )
 

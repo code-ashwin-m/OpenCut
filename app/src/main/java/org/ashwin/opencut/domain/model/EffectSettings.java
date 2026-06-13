@@ -8,4 +8,8 @@ public class EffectSettings {
     public float saturation = 1f;
 
     public float exposure = 0f;
+
+    public float highlights = 0f;
+
+    public float shadows = 0f;
 }

@@ -83,13 +83,17 @@ class EditorViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(exportProgress = progress)
     }
 
-    fun updateBrightness(brightness: Float) {
+    private fun updateEffectSettings(updateBlock: (EffectSettings) -> Unit) {
         val currentSettings = _uiState.value.effectSettings
-        val newSettings = EffectSettings()
-        newSettings.brightness = brightness
-        newSettings.contrast = currentSettings.contrast
-        newSettings.saturation = currentSettings.saturation
-        newSettings.exposure = currentSettings.exposure
+        val newSettings = EffectSettings().apply {
+            brightness = currentSettings.brightness
+            contrast = currentSettings.contrast
+            saturation = currentSettings.saturation
+            exposure = currentSettings.exposure
+            highlights = currentSettings.highlights
+            shadows = currentSettings.shadows
+        }
+        updateBlock(newSettings)
         _uiState.value = _uiState.value.copy(effectSettings = newSettings)
 
         saveJob?.cancel()
@@ -100,44 +104,26 @@ class EditorViewModel @Inject constructor(
                 projectRepository.saveProject(currentProject)
             }
         }
+    }
+
+    fun updateBrightness(brightness: Float) {
+        updateEffectSettings { it.brightness = brightness }
     }
 
     fun updateContrast(contrast: Float) {
-        val currentSettings = _uiState.value.effectSettings
-        val newSettings = EffectSettings()
-        newSettings.brightness = currentSettings.brightness
-        newSettings.contrast = contrast
-        newSettings.saturation = currentSettings.saturation
-        newSettings.exposure = currentSettings.exposure
-        _uiState.value = _uiState.value.copy(effectSettings = newSettings)
-
-        saveJob?.cancel()
-        saveJob = viewModelScope.launch {
-            delay(500)
-            _projectState.value?.let { currentProject ->
-                currentProject.effectSettings = newSettings
-                projectRepository.saveProject(currentProject)
-            }
-        }
+        updateEffectSettings { it.contrast = contrast }
     }
 
     fun updateExposure(exposure: Float) {
-        val currentSettings = _uiState.value.effectSettings
-        val newSettings = EffectSettings()
-        newSettings.brightness = currentSettings.brightness
-        newSettings.contrast = currentSettings.contrast
-        newSettings.saturation = currentSettings.saturation
-        newSettings.exposure = exposure
-        _uiState.value = _uiState.value.copy(effectSettings = newSettings)
+        updateEffectSettings { it.exposure = exposure }
+    }
 
-        saveJob?.cancel()
-        saveJob = viewModelScope.launch {
-            delay(500)
-            _projectState.value?.let { currentProject ->
-                currentProject.effectSettings = newSettings
-                projectRepository.saveProject(currentProject)
-            }
-        }
+    fun updateHighlights(highlights: Float) {
+        updateEffectSettings { it.highlights = highlights }
+    }
+
+    fun updateShadows(shadows: Float) {
+        updateEffectSettings { it.shadows = shadows }
     }
 
     fun finishExport() {

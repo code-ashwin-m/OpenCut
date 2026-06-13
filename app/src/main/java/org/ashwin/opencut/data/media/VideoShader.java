@@ -41,6 +41,8 @@ public class VideoShader {
     private final int brightnessHandle;
     private final int contrastHandle;
     private final int exposureHandle;
+    private final int highlightsHandle;
+    private final int shadowsHandle;
 
     private int mvpMatrixHandle;
 
@@ -143,6 +145,18 @@ public class VideoShader {
                         "uExposure"
                 );
 
+        highlightsHandle =
+                GLES20.glGetUniformLocation(
+                        program,
+                        "uHighlights"
+                );
+
+        shadowsHandle =
+                GLES20.glGetUniformLocation(
+                        program,
+                        "uShadows"
+                );
+
         mvpMatrixHandle =
                 GLES20.glGetUniformLocation(
                         program,
@@ -225,6 +239,18 @@ public class VideoShader {
         GLES20.glUniform1f(
                 exposureHandle,
                 exposure
+        );
+
+        float highlights = effectSettings != null ? effectSettings.highlights : 0f;
+        GLES20.glUniform1f(
+                highlightsHandle,
+                highlights
+        );
+
+        float shadows = effectSettings != null ? effectSettings.shadows : 0f;
+        GLES20.glUniform1f(
+                shadowsHandle,
+                shadows
         );
 
         GLES20.glDrawArrays(
