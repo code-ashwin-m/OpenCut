@@ -62,8 +62,8 @@ class MainActivity : ComponentActivity() {
 
     private fun exportVideo() {
         val outputFile = File(
-            getExternalFilesDir(Environment.DIRECTORY_MOVIES),
-            "exported_video.mp4"
+            cacheDir,
+            "exported_video_tmp.mp4"
         )
         viewModel.startExport(inputUri, outputFile.absolutePath)
     }
