@@ -24,6 +24,11 @@ public class VideoExporter {
     private boolean muxerStarted = false;
     private float lastProgress = 0f;
 
+    // AUDIO
+    private int muxerAudioTrackIndex = -1;
+    private boolean audioDone = false;
+    private ByteBuffer audioBuffer = ByteBuffer.allocateDirect(1024 * 1024);
+    private MediaCodec.BufferInfo audioBufferInfo = new MediaCodec.BufferInfo();
 
     public VideoExporter(Context context) {
         this.context = context;
@@ -61,6 +66,7 @@ public class VideoExporter {
             ExportCallback callback
     ) throws Exception {
 
+        // INPUT VIDEO
         inputDone = false;
         decoderDone = false;
         encoderDone = false;
@@ -69,25 +75,17 @@ public class VideoExporter {
         muxerTrackIndex = -1;
         lastProgress = 0f;
 
+
+
         MediaExtractor extractor =
                 new MediaExtractor();
 
-        MediaExtractor audioExtractor =
-                new MediaExtractor();
 
         extractor.setDataSource(
                 context,
                 inputUri,
                 null
         );
-
-        audioExtractor.setDataSource(
-                context,
-                inputUri,
-                null
-        );
-
-        // INPUT VIDEO
 
         int videoTrack = findVideoTrack(extractor);
         extractor.selectTrack(videoTrack);
@@ -120,6 +118,25 @@ public class VideoExporter {
                         mime
                 );
 
+        // INPUT AUDIO
+
+        audioDone = false;
+
+        MediaExtractor audioExtractor = new MediaExtractor();
+
+        audioExtractor.setDataSource(context, inputUri, null);
+
+        int audioTrack = findAudioTrack(audioExtractor);
+
+        MediaFormat audioFormat = null;
+
+        if (audioTrack >= 0) {
+
+            audioExtractor.selectTrack(audioTrack);
+
+            audioFormat = audioExtractor.getTrackFormat(audioTrack);
+        }
+        
 
         // OUTPUT
 
@@ -193,12 +210,19 @@ public class VideoExporter {
 
         muxer = new MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
 
-        while (!encoderDone) {
+        if (audioTrack >= 0) {
+            muxerAudioTrackIndex = muxer.addTrack(audioFormat);
+            Log.d("EXPORT", "Audio track added: " + muxerAudioTrackIndex);
+        }
+
+        while (!encoderDone || !audioDone) {
             feedDecoderInput(decoder, extractor);
 
             drainDecoderOutput(decoder, encoder, inputSurface, outputSurface);
 
             drainEncoderOutput(encoder, totalDurationUs, callback);
+
+            drainAudioTrack(audioExtractor);
         }
 
         if (muxerStarted) {
@@ -214,6 +238,9 @@ public class VideoExporter {
 
         inputSurface.release();
         outputSurface.release();
+
+        extractor.release();
+        audioExtractor.release();
 
         callback.onSuccess(outputPath);
     }
@@ -376,5 +403,41 @@ public class VideoExporter {
                 break;
             }
         }
+    }
+
+    private void drainAudioTrack(MediaExtractor audioExtractor) {
+
+        if (!muxerStarted)
+            return;
+
+        if (audioDone)
+            return;
+
+        audioBuffer.clear();
+
+        int sampleSize = audioExtractor.readSampleData(audioBuffer, 0);
+
+        if (sampleSize < 0) {
+
+            audioDone = true;
+            return;
+        }
+
+        audioBufferInfo.offset = 0;
+        audioBufferInfo.size = sampleSize;
+
+        audioBufferInfo.presentationTimeUs =
+                audioExtractor.getSampleTime();
+
+        audioBufferInfo.flags =
+                audioExtractor.getSampleFlags();
+
+        muxer.writeSampleData(
+                muxerAudioTrackIndex,
+                audioBuffer,
+                audioBufferInfo
+        );
+
+        audioExtractor.advance();
     }
 }
