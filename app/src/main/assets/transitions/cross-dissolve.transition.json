@@ -1,0 +1,15 @@
+{
+  "id": "opencut.transition.cross_dissolve",
+  "name": "Cross Dissolve",
+  "engineNode": "gpu.transition.cross_dissolve",
+  "minEngineVersion": 1,
+  "parameters": [
+    {
+      "id": "curve",
+      "name": "Curve",
+      "type": "CHOICE",
+      "defaultValue": "linear",
+      "options": ["linear", "ease_in", "ease_out", "ease_in_out"]
+    }
+  ]
+}

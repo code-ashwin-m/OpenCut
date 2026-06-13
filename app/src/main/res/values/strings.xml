@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">OpenCut</string>
+    <string name="projects_title">Projects</string>
+    <string name="new_project">New project</string>
+    <string name="empty_projects">No projects yet</string>
+    <string name="empty_projects_hint">Create an empty project to start editing.</string>
+    <string name="back_to_projects">Projects</string>
+    <string name="editor_stub_title">Editor workspace</string>
+</resources>

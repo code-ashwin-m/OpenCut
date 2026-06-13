@@ -1,0 +1,17 @@
+{
+  "id": "opencut.effect.blur",
+  "name": "Blur",
+  "category": "BLUR",
+  "engineNode": "gpu.blur.gaussian",
+  "minEngineVersion": 1,
+  "parameters": [
+    {
+      "id": "radius",
+      "name": "Radius",
+      "type": "FLOAT",
+      "defaultValue": "8.0",
+      "minValue": "0.0",
+      "maxValue": "64.0"
+    }
+  ]
+}

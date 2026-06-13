@@ -1,0 +1,17 @@
+{
+  "id": "opencut.effect.exposure",
+  "name": "Exposure",
+  "category": "COLOR",
+  "engineNode": "gpu.color.exposure",
+  "minEngineVersion": 1,
+  "parameters": [
+    {
+      "id": "stops",
+      "name": "Stops",
+      "type": "FLOAT",
+      "defaultValue": "0.0",
+      "minValue": "-5.0",
+      "maxValue": "5.0"
+    }
+  ]
+}
