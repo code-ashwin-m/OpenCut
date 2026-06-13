@@ -10,7 +10,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import androidx.lifecycle.SavedStateHandle
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import org.ashwin.opencut.domain.model.EffectSettings
+import org.ashwin.opencut.domain.model.ProjectState
+import org.ashwin.opencut.domain.repository.ProjectRepository
 import org.ashwin.opencut.domain.usecase.ExportVideoUseCase
 import javax.inject.Inject
 
@@ -22,11 +27,31 @@ data class EditorUiState(
 
 @HiltViewModel
 class EditorViewModel @Inject constructor(
+    private val savedStateHandle: SavedStateHandle,
+    private val projectRepository: ProjectRepository,
     private val exportVideoUseCase: ExportVideoUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
+
+    private val _projectState = MutableStateFlow<ProjectState?>(null)
+    val projectState: StateFlow<ProjectState?> = _projectState.asStateFlow()
+
+    private val projectId: String? = savedStateHandle["projectId"]
+    private var saveJob: Job? = null
+
+    init {
+        projectId?.let { id ->
+            viewModelScope.launch {
+                val project = projectRepository.getProjectById(id)
+                if (project != null) {
+                    _projectState.value = project
+                    _uiState.value = _uiState.value.copy(effectSettings = project.effectSettings)
+                }
+            }
+        }
+    }
 
     fun startExport(inputUri: Uri, outputPath: String) {
         _uiState.value = _uiState.value.copy(isExporting = true, exportProgress = 0f)
@@ -63,6 +88,15 @@ class EditorViewModel @Inject constructor(
         val newSettings = EffectSettings()
         newSettings.brightness = brightness
         _uiState.value = _uiState.value.copy(effectSettings = newSettings)
+
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
+            delay(500)
+            _projectState.value?.let { currentProject ->
+                currentProject.effectSettings = newSettings
+                projectRepository.saveProject(currentProject)
+            }
+        }
     }
 
     fun finishExport() {

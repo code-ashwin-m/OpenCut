@@ -39,7 +39,10 @@ implements GLSurfaceView.Renderer,
 
     private int videoWidth;
     private int videoHeight;
-    private EffectSettings effectSettings;
+    private int surfaceWidth;
+    private int surfaceHeight;
+    private boolean aspectNeedsUpdate = false;
+    private EffectSettings effectSettings = new EffectSettings();
 
     public PreviewRenderer(Context context) {
         this.context = context;
@@ -71,51 +74,27 @@ implements GLSurfaceView.Renderer,
 
     @Override
     public void onSurfaceChanged(GL10 gl, int width, int height) {
-        GLES20.glViewport(0,0,width,height);
+        GLES20.glViewport(0, 0, width, height);
+        this.surfaceWidth = width;
+        this.surfaceHeight = height;
+        this.aspectNeedsUpdate = true;
+    }
 
-        Matrix.setIdentityM(
-                mvpMatrix,
-                0
-        );
+    private void updateViewportMatrix() {
+        Matrix.setIdentityM(mvpMatrix, 0);
 
-        if(videoWidth == 0 || videoHeight == 0)
+        if (videoWidth == 0 || videoHeight == 0 || surfaceWidth == 0 || surfaceHeight == 0)
             return;
 
-        float videoAspect =
-                (float) videoWidth /
-                        videoHeight;
+        float videoAspect = (float) videoWidth / videoHeight;
+        float viewAspect = (float) surfaceWidth / surfaceHeight;
 
-        float viewAspect =
-                (float) width /
-                        height;
-
-        if(videoAspect > viewAspect){
-
-            float scaleY =
-                    viewAspect /
-                            videoAspect;
-
-            Matrix.scaleM(
-                    mvpMatrix,
-                    0,
-                    1f,
-                    scaleY,
-                    1f
-            );
-
+        if (videoAspect > viewAspect) {
+            float scaleY = viewAspect / videoAspect;
+            Matrix.scaleM(mvpMatrix, 0, 1f, scaleY, 1f);
         } else {
-
-            float scaleX =
-                    videoAspect /
-                            viewAspect;
-
-            Matrix.scaleM(
-                    mvpMatrix,
-                    0,
-                    scaleX,
-                    1f,
-                    1f
-            );
+            float scaleX = videoAspect / viewAspect;
+            Matrix.scaleM(mvpMatrix, 0, scaleX, 1f, 1f);
         }
     }
 
@@ -125,10 +104,13 @@ implements GLSurfaceView.Renderer,
                 GLES20.GL_COLOR_BUFFER_BIT
         );
 
+        if (aspectNeedsUpdate) {
+            updateViewportMatrix();
+            aspectNeedsUpdate = false;
+        }
+
         if (frameAvailable) {
-
             surfaceTexture.updateTexImage();
-
             frameAvailable = false;
         }
 
@@ -146,26 +128,17 @@ implements GLSurfaceView.Renderer,
 
     private void playVideo(Uri uri) {
         try {
-
             mediaPlayer.reset();
-
             mediaPlayer.setDataSource(
                     context,
                     uri
             );
-
             mediaPlayer.prepare();
-
-            videoWidth =
-                    mediaPlayer.getVideoWidth();
-
-            videoHeight =
-                    mediaPlayer.getVideoHeight();
-
+            videoWidth = mediaPlayer.getVideoWidth();
+            videoHeight = mediaPlayer.getVideoHeight();
+            aspectNeedsUpdate = true;
             mediaPlayer.setLooping(true);
-
             mediaPlayer.start();
-
         } catch (Exception e) {
             e.printStackTrace();
         }

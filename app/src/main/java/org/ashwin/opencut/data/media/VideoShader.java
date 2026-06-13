@@ -195,9 +195,10 @@ public class VideoShader {
                 0
         );
 
+        float brightness = effectSettings != null ? effectSettings.brightness : 0f;
         GLES20.glUniform1f(
                 brightnessHandle,
-                effectSettings.brightness
+                brightness
         );
 
         GLES20.glDrawArrays(

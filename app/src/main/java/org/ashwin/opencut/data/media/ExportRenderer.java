@@ -13,7 +13,7 @@ public class ExportRenderer {
     private VideoShader shader;
     private final float[] mvpMatrix =
             new float[16];
-    private EffectSettings effectSettings;
+    private EffectSettings effectSettings = new EffectSettings();
 
     private Context context;
 

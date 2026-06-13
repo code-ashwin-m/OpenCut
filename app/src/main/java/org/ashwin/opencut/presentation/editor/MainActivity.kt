@@ -2,18 +2,14 @@ package org.ashwin.opencut.presentation.editor
 
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -37,48 +33,71 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import dagger.hilt.android.AndroidEntryPoint
 import org.ashwin.opencut.R
+import org.ashwin.opencut.presentation.home.ProjectListScreen
+import org.ashwin.opencut.presentation.home.ProjectListViewModel
 import org.ashwin.opencut.presentation.preview.VideoPreviewView
 import java.io.File
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private val viewModel: EditorViewModel by viewModels()
-
-    private lateinit var previewView: VideoPreviewView
-    private lateinit var inputUri: Uri
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        previewView = VideoPreviewView(this)
-        inputUri = Uri.parse("android.resource://${packageName}/${R.raw.sample}")
-
-        previewView.loadVideo(inputUri)
-
         setContent {
-            val uiState by viewModel.uiState.collectAsState()
+            val navController = rememberNavController()
+            NavHost(navController = navController, startDestination = "home") {
+                composable("home") {
+                    val homeViewModel: ProjectListViewModel = hiltViewModel()
+                    ProjectListScreen(
+                        viewModel = homeViewModel,
+                        onNavigateToEditor = { projectId ->
+                            navController.navigate("editor/$projectId")
+                        }
+                    )
+                }
+                composable(
+                    route = "editor/{projectId}",
+                    arguments = listOf(navArgument("projectId") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val editorViewModel: EditorViewModel = hiltViewModel()
+                    val uiState by editorViewModel.uiState.collectAsState()
 
-            LaunchedEffect(uiState.effectSettings.brightness) {
-                previewView.setEffect(uiState.effectSettings)
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val inputUri = remember { Uri.parse("android.resource://${context.packageName}/${R.raw.sample}") }
+                    val previewView = remember {
+                        VideoPreviewView(context).apply {
+                            loadVideo(inputUri)
+                        }
+                    }
+
+                    LaunchedEffect(uiState.effectSettings.brightness) {
+                        previewView.setEffect(uiState.effectSettings)
+                    }
+
+                    EditorScreen(
+                        previewView = previewView,
+                        uiState = uiState,
+                        onBrightnessChange = { editorViewModel.updateBrightness(it) },
+                        onExportVideo = {
+                            val outputFile = File(
+                                context.cacheDir,
+                                "exported_video_tmp.mp4"
+                            )
+                            editorViewModel.startExport(inputUri, outputFile.absolutePath)
+                        }
+                    )
+                }
             }
-
-            EditorScreen(
-                previewView = previewView,
-                uiState = uiState,
-                onBrightnessChange = { viewModel.updateBrightness(it) },
-                onExportVideo = { exportVideo() }
-            )
         }
-    }
-
-    private fun exportVideo() {
-        val outputFile = File(
-            cacheDir,
-            "exported_video_tmp.mp4"
-        )
-        viewModel.startExport(inputUri, outputFile.absolutePath)
     }
 }
 
