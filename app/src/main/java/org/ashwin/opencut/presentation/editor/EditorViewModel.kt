@@ -84,9 +84,31 @@ class EditorViewModel @Inject constructor(
     }
 
     fun updateBrightness(brightness: Float) {
-        // Create a new instance of EffectSettings to ensure StateFlow emits the change and Compose recomposes
+        val currentSettings = _uiState.value.effectSettings
         val newSettings = EffectSettings()
         newSettings.brightness = brightness
+        newSettings.contrast = currentSettings.contrast
+        newSettings.saturation = currentSettings.saturation
+        newSettings.exposure = currentSettings.exposure
+        _uiState.value = _uiState.value.copy(effectSettings = newSettings)
+
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
+            delay(500)
+            _projectState.value?.let { currentProject ->
+                currentProject.effectSettings = newSettings
+                projectRepository.saveProject(currentProject)
+            }
+        }
+    }
+
+    fun updateContrast(contrast: Float) {
+        val currentSettings = _uiState.value.effectSettings
+        val newSettings = EffectSettings()
+        newSettings.brightness = currentSettings.brightness
+        newSettings.contrast = contrast
+        newSettings.saturation = currentSettings.saturation
+        newSettings.exposure = currentSettings.exposure
         _uiState.value = _uiState.value.copy(effectSettings = newSettings)
 
         saveJob?.cancel()

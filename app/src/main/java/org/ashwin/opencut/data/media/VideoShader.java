@@ -39,6 +39,7 @@ public class VideoShader {
 
     private final int textureHandle;
     private final int brightnessHandle;
+    private final int contrastHandle;
 
     private int mvpMatrixHandle;
 
@@ -129,6 +130,12 @@ public class VideoShader {
                         "uBrightness"
                 );
 
+        contrastHandle =
+                GLES20.glGetUniformLocation(
+                        program,
+                        "uContrast"
+                );
+
         mvpMatrixHandle =
                 GLES20.glGetUniformLocation(
                         program,
@@ -199,6 +206,12 @@ public class VideoShader {
         GLES20.glUniform1f(
                 brightnessHandle,
                 brightness
+        );
+
+        float contrast = effectSettings != null ? effectSettings.contrast : 1f;
+        GLES20.glUniform1f(
+                contrastHandle,
+                contrast
         );
 
         GLES20.glDrawArrays(

@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    LaunchedEffect(uiState.effectSettings.brightness) {
+                    LaunchedEffect(uiState.effectSettings) {
                         previewView.setEffect(uiState.effectSettings)
                     }
 
@@ -95,6 +95,7 @@ class MainActivity : ComponentActivity() {
                         previewView = previewView,
                         uiState = uiState,
                         onBrightnessChange = { editorViewModel.updateBrightness(it) },
+                        onContrastChange = { editorViewModel.updateContrast(it) },
                         onExportVideo = {
                             val outputFile = File(
                                 context.cacheDir,
@@ -117,6 +118,7 @@ fun EditorScreen(
     previewView: VideoPreviewView,
     uiState: EditorUiState,
     onBrightnessChange: (Float) -> Unit,
+    onContrastChange: (Float) -> Unit,
     onExportVideo: () -> Unit,
     onBackClick: () -> Unit,
 ) {
@@ -196,6 +198,20 @@ fun EditorScreen(
                 value = uiState.effectSettings.brightness,
                 onValueChange = onBrightnessChange,
                 valueRange = -1f..1f,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.size(16.dp))
+
+            Text(
+                text = "Contrast: %.2f".format(uiState.effectSettings.contrast),
+                color = Color.White
+            )
+
+            Slider(
+                value = uiState.effectSettings.contrast,
+                onValueChange = onContrastChange,
+                valueRange = 0f..2f,
                 modifier = Modifier.fillMaxWidth()
             )
 
