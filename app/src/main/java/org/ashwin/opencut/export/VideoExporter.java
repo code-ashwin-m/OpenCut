@@ -14,15 +14,18 @@ import org.ashwin.opencut.core.EffectSettings;
 import java.nio.ByteBuffer;
 
 public class VideoExporter {
+    // GLOBAL
     private final Context context;
-    private boolean inputDone = false;
-    private boolean decoderDone = false;
-    private boolean encoderDone = false;
-    private MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
     private MediaMuxer muxer;
-    private int muxerTrackIndex = -1;
     private boolean muxerStarted = false;
     private float lastProgress = 0f;
+
+    // VIDEO
+    private boolean videoDecoderDone = false;
+    private boolean videoEncoderDone = false;
+    private int muxerVideoTrackIndex = -1;
+    private boolean videoDone = false;
+    private MediaCodec.BufferInfo videoBufferInfo = new MediaCodec.BufferInfo();
 
     // AUDIO
     private int muxerAudioTrackIndex = -1;
@@ -67,15 +70,13 @@ public class VideoExporter {
     ) throws Exception {
 
         // INPUT VIDEO
-        inputDone = false;
-        decoderDone = false;
-        encoderDone = false;
+        videoDone = false;
+        videoDecoderDone = false;
+        videoEncoderDone = false;
 
         muxerStarted = false;
-        muxerTrackIndex = -1;
+        muxerVideoTrackIndex = -1;
         lastProgress = 0f;
-
-
 
         MediaExtractor extractor =
                 new MediaExtractor();
@@ -215,7 +216,7 @@ public class VideoExporter {
             Log.d("EXPORT", "Audio track added: " + muxerAudioTrackIndex);
         }
 
-        while (!encoderDone || !audioDone) {
+        while (!videoDone || !audioDone) {
             feedDecoderInput(decoder, extractor);
 
             drainDecoderOutput(decoder, encoder, inputSurface, outputSurface);
@@ -278,7 +279,7 @@ public class VideoExporter {
     }
 
     private void feedDecoderInput(MediaCodec decoder, MediaExtractor extractor) {
-        if (!inputDone) {
+        if (!videoDone) {
 
             int inputBufferId = decoder.dequeueInputBuffer(10000);
 
@@ -292,7 +293,7 @@ public class VideoExporter {
 
                     decoder.queueInputBuffer(inputBufferId, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
 
-                    inputDone = true;
+                    videoDone = true;
 
                 } else {
 
@@ -307,13 +308,13 @@ public class VideoExporter {
     }
 
     private void drainDecoderOutput(MediaCodec decoder, MediaCodec encoder, InputSurface inputSurface, OutputSurface outputSurface) {
-        if (!decoderDone) {
+        if (!videoDecoderDone) {
 
-            int decoderStatus = decoder.dequeueOutputBuffer(bufferInfo, 10000);
+            int decoderStatus = decoder.dequeueOutputBuffer(videoBufferInfo, 10000);
 
             if (decoderStatus >= 0) {
 
-                boolean doRender = bufferInfo.size > 0;
+                boolean doRender = videoBufferInfo.size > 0;
 
                 decoder.releaseOutputBuffer(decoderStatus, doRender);
 
@@ -328,11 +329,11 @@ public class VideoExporter {
                     inputSurface.swapBuffers();
                 }
 
-                if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                if ((videoBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
 
                     encoder.signalEndOfInputStream();
 
-                    decoderDone = true;
+                    videoDecoderDone = true;
                 }
             }
         }
@@ -342,7 +343,7 @@ public class VideoExporter {
     private void drainEncoderOutput(MediaCodec encoder, long totalDurationUs, ExportCallback callback) {
         while (true) {
 
-            int encoderStatus = encoder.dequeueOutputBuffer(bufferInfo, 0);
+            int encoderStatus = encoder.dequeueOutputBuffer(videoBufferInfo, 0);
 
             if (encoderStatus == MediaCodec.INFO_TRY_AGAIN_LATER) {
                 break;
@@ -354,7 +355,7 @@ public class VideoExporter {
 
                 MediaFormat videoFormat = encoder.getOutputFormat();
 
-                muxerTrackIndex = muxer.addTrack(videoFormat);
+                muxerVideoTrackIndex = muxer.addTrack(videoFormat);
 
                 muxer.start();
 
@@ -374,15 +375,15 @@ public class VideoExporter {
                 throw new RuntimeException("encoderOutputBuffer null");
             }
 
-            if (bufferInfo.size > 0) {
+            if (videoBufferInfo.size > 0) {
 
-                encodedData.position(bufferInfo.offset);
+                encodedData.position(videoBufferInfo.offset);
 
-                encodedData.limit(bufferInfo.offset + bufferInfo.size);
+                encodedData.limit(videoBufferInfo.offset + videoBufferInfo.size);
 
-                muxer.writeSampleData(muxerTrackIndex, encodedData, bufferInfo);
+                muxer.writeSampleData(muxerVideoTrackIndex, encodedData, videoBufferInfo);
 
-                float progress = bufferInfo.presentationTimeUs / (float) totalDurationUs;
+                float progress = videoBufferInfo.presentationTimeUs / (float) totalDurationUs;
 
                 if (progress - lastProgress > 0.01f) {
 
@@ -391,14 +392,14 @@ public class VideoExporter {
                     callback.onProgress(progress);
                 }
 
-                Log.d("EXPORT", "muxer write size=" + bufferInfo.size);
+                Log.d("EXPORT", "muxer write size=" + videoBufferInfo.size);
             }
 
             encoder.releaseOutputBuffer(encoderStatus, false);
 
-            if ((bufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+            if ((videoBufferInfo.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
 
-                encoderDone = true;
+                videoEncoderDone = true;
 
                 break;
             }
