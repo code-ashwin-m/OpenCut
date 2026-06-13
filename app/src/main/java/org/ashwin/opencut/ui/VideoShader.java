@@ -32,16 +32,20 @@ public class VideoShader {
     private final int textureHandle;
     private final int brightnessHandle;
 
+    private int mvpMatrixHandle;
+
     private static final String VERTEX_SHADER =
             "attribute vec4 aPosition;\n" +
-                    "attribute vec2 aTexCoord;\n" +
-                    "\n" +
-                    "varying vec2 vTexCoord;\n" +
-                    "\n" +
-                    "void main() {\n" +
-                    "    gl_Position = aPosition;\n" +
-                    "    vTexCoord = aTexCoord;\n" +
-                    "}";
+            "attribute vec2 aTexCoord;\n" +
+            "uniform mat4 uMVPMatrix;\n" +
+            "\n" +
+            "varying vec2 vTexCoord;\n" +
+            "\n" +
+            "void main() {\n" +
+            "//    gl_Position = aPosition;\n" +
+            "    gl_Position = uMVPMatrix * aPosition;\n" +
+            "    vTexCoord = aTexCoord;\n" +
+            "}";
 
     private static final String FRAGMENT_SHADER =
             "#extension GL_OES_EGL_image_external : require\n" +
@@ -123,12 +127,18 @@ public class VideoShader {
                         program,
                         "uBrightness"
                 );
+
+        mvpMatrixHandle =
+                GLES20.glGetUniformLocation(
+                        program,
+                        "uMVPMatrix"
+                );
     }
 
     public void draw(
             int textureId,
-            float brightness
-    ) {
+            float brightness,
+            float[] mvpMatrix) {
 
         GLES20.glUseProgram(program);
 
@@ -169,6 +179,14 @@ public class VideoShader {
         GLES20.glBindTexture(
                 GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
                 textureId
+        );
+
+        GLES20.glUniformMatrix4fv(
+                mvpMatrixHandle,
+                1,
+                false,
+                mvpMatrix,
+                0
         );
 
         GLES20.glUniform1i(

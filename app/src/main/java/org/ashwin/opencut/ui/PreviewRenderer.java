@@ -6,6 +6,7 @@ import android.media.MediaPlayer;
 import android.net.Uri;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
+import android.opengl.Matrix;
 import android.util.Log;
 import android.view.Surface;
 
@@ -34,10 +35,11 @@ implements GLSurfaceView.Renderer,
 
     private boolean frameAvailable = false;
 
-    private float scaleX = 1f;
-    private float scaleY = 1f;
-    private int videoWidth = 0;
-    private int videoHeight = 0;
+    private final float[] mvpMatrix =
+            new float[16];
+
+    private int videoWidth;
+    private int videoHeight;
 
     public PreviewRenderer(Context context) {
         this.context = context;
@@ -70,6 +72,51 @@ implements GLSurfaceView.Renderer,
     @Override
     public void onSurfaceChanged(GL10 gl, int width, int height) {
         GLES20.glViewport(0,0,width,height);
+
+        Matrix.setIdentityM(
+                mvpMatrix,
+                0
+        );
+
+        if(videoWidth == 0 || videoHeight == 0)
+            return;
+
+        float videoAspect =
+                (float) videoWidth /
+                        videoHeight;
+
+        float viewAspect =
+                (float) width /
+                        height;
+
+        if(videoAspect > viewAspect){
+
+            float scaleY =
+                    viewAspect /
+                            videoAspect;
+
+            Matrix.scaleM(
+                    mvpMatrix,
+                    0,
+                    1f,
+                    scaleY,
+                    1f
+            );
+
+        } else {
+
+            float scaleX =
+                    videoAspect /
+                            viewAspect;
+
+            Matrix.scaleM(
+                    mvpMatrix,
+                    0,
+                    scaleX,
+                    1f,
+                    1f
+            );
+        }
     }
 
     @Override
@@ -85,7 +132,7 @@ implements GLSurfaceView.Renderer,
             frameAvailable = false;
         }
 
-        videoShader.draw(textureId, brightness);
+        videoShader.draw(textureId, brightness, mvpMatrix);
     }
 
     public void loadVideo(Uri uri) {
