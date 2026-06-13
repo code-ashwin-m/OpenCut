@@ -11,6 +11,7 @@ import android.util.Log;
 import android.view.Surface;
 
 import org.ashwin.opencut.domain.model.EffectSettings;
+import org.ashwin.opencut.platform.nativebridge.NativeEngineBridge;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -30,7 +31,7 @@ implements GLSurfaceView.Renderer,
 
     private Uri pendingVideoUri;
 
-    private VideoShader videoShader;
+    // VideoShader is now implemented native-side in C++
 
     private boolean frameAvailable = false;
 
@@ -61,7 +62,16 @@ implements GLSurfaceView.Renderer,
 
         surfaceTexture.setOnFrameAvailableListener(this);
 
-        videoShader = new VideoShader(context);
+        if (effectSettings != null) {
+            NativeEngineBridge.INSTANCE.nativeSetEffects(
+                effectSettings.brightness,
+                effectSettings.contrast,
+                effectSettings.exposure,
+                effectSettings.highlights,
+                effectSettings.shadows
+            );
+        }
+        NativeEngineBridge.INSTANCE.nativeInitRenderer();
 
         initPlayer();
 
@@ -114,7 +124,7 @@ implements GLSurfaceView.Renderer,
             frameAvailable = false;
         }
 
-        videoShader.draw(textureId, effectSettings, mvpMatrix);
+        NativeEngineBridge.INSTANCE.nativeDrawFrame(textureId, mvpMatrix);
     }
 
     public void loadVideo(Uri uri) {
@@ -145,6 +155,15 @@ implements GLSurfaceView.Renderer,
 
     public void setEffect(EffectSettings effectSettings) {
         this.effectSettings = effectSettings;
+        if (effectSettings != null) {
+            NativeEngineBridge.INSTANCE.nativeSetEffects(
+                effectSettings.brightness,
+                effectSettings.contrast,
+                effectSettings.exposure,
+                effectSettings.highlights,
+                effectSettings.shadows
+            );
+        }
     }
 
     private void initPlayer() {
@@ -177,6 +196,7 @@ implements GLSurfaceView.Renderer,
     }
 
     public void release() {
+        NativeEngineBridge.INSTANCE.nativeReleaseRenderer();
         if (mediaPlayer != null) {
             try {
                 if (mediaPlayer.isPlaying()) {
