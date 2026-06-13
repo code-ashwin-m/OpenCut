@@ -44,22 +44,21 @@ public class VideoExporter {
             ExportCallback callback
     ) {
         new Thread(() -> {
-
-            try {
-
-                doExport(
-                        input,
-                        output,
-                        effects,
-                        callback
-                );
-
-            } catch (Exception e) {
-
-                callback.onError(e);
-            }
-
+            exportSync(input, output, effects, callback);
         }).start();
+    }
+
+    public void exportSync(
+            Uri input,
+            String output,
+            EffectSettings effects,
+            ExportCallback callback
+    ) {
+        try {
+            doExport(input, output, effects, callback);
+        } catch (Exception e) {
+            callback.onError(e);
+        }
     }
 
     private void doExport(

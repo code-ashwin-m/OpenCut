@@ -1,36 +1,75 @@
-package org.ashwin.opencut.presentation.editor;
+package org.ashwin.opencut.presentation.editor
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import android.net.Uri
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.asFlow
+import androidx.work.WorkInfo
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import org.ashwin.opencut.domain.model.EffectSettings
+import org.ashwin.opencut.domain.usecase.ExportVideoUseCase
+import javax.inject.Inject
 
-class EditorViewModel : ViewModel() {
+data class EditorUiState(
+    val exportProgress: Float = 0f,
+    val isExporting: Boolean = false,
+    val effectSettings: EffectSettings = EffectSettings()
+)
 
-    var exportProgress by mutableFloatStateOf(0f)
-        private set
+@HiltViewModel
+class EditorViewModel @Inject constructor(
+    private val exportVideoUseCase: ExportVideoUseCase
+) : ViewModel() {
 
-    var isExporting by mutableStateOf(false)
-        private set
+    private val _uiState = MutableStateFlow(EditorUiState())
+    val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
-    fun startExport() {
-        isExporting = true
-        exportProgress = 0f
+    fun startExport(inputUri: Uri, outputPath: String) {
+        _uiState.value = _uiState.value.copy(isExporting = true, exportProgress = 0f)
+        
+        viewModelScope.launch {
+            exportVideoUseCase.execute(inputUri, outputPath, _uiState.value.effectSettings)
+                .asFlow()
+                .collect { workInfo ->
+                    when (workInfo.state) {
+                        WorkInfo.State.RUNNING -> {
+                            val progress = workInfo.progress.getFloat("progress", 0f)
+                            updateProgress(progress)
+                        }
+                        WorkInfo.State.SUCCEEDED -> {
+                            finishExport()
+                        }
+                        WorkInfo.State.FAILED, WorkInfo.State.CANCELLED -> {
+                            failExport()
+                        }
+                        else -> {
+                            // Ignored (ENQUEUED, BLOCKED)
+                        }
+                    }
+                }
+        }
     }
 
-    fun updateProgress(
-        progress: Float
-    ) {
-        exportProgress = progress
+    fun updateProgress(progress: Float) {
+        _uiState.value = _uiState.value.copy(exportProgress = progress)
+    }
+
+    fun updateBrightness(brightness: Float) {
+        // Create a new instance of EffectSettings to ensure StateFlow emits the change and Compose recomposes
+        val newSettings = EffectSettings()
+        newSettings.brightness = brightness
+        _uiState.value = _uiState.value.copy(effectSettings = newSettings)
     }
 
     fun finishExport() {
-        exportProgress = 1f
-        isExporting = false
+        _uiState.value = _uiState.value.copy(isExporting = false, exportProgress = 1f)
     }
 
     fun failExport() {
-        isExporting = false
+        _uiState.value = _uiState.value.copy(isExporting = false)
     }
 }
