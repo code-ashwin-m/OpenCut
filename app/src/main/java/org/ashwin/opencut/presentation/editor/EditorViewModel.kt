@@ -121,6 +121,25 @@ class EditorViewModel @Inject constructor(
         }
     }
 
+    fun updateExposure(exposure: Float) {
+        val currentSettings = _uiState.value.effectSettings
+        val newSettings = EffectSettings()
+        newSettings.brightness = currentSettings.brightness
+        newSettings.contrast = currentSettings.contrast
+        newSettings.saturation = currentSettings.saturation
+        newSettings.exposure = exposure
+        _uiState.value = _uiState.value.copy(effectSettings = newSettings)
+
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
+            delay(500)
+            _projectState.value?.let { currentProject ->
+                currentProject.effectSettings = newSettings
+                projectRepository.saveProject(currentProject)
+            }
+        }
+    }
+
     fun finishExport() {
         _uiState.value = _uiState.value.copy(isExporting = false, exportProgress = 1f)
     }

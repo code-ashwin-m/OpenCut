@@ -20,7 +20,7 @@ class FileProjectRepositoryImpl @Inject constructor(
     private val gson: Gson
 ) : ProjectRepository {
 
-    private val projectsDir = File(context.filesDir, "projects").apply {
+    private val projectsDir = File(context.getExternalFilesDir(null), "projects").apply {
         if (!exists()) mkdirs()
     }
 

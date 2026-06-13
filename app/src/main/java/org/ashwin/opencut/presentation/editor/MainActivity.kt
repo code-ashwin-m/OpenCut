@@ -96,6 +96,7 @@ class MainActivity : ComponentActivity() {
                         uiState = uiState,
                         onBrightnessChange = { editorViewModel.updateBrightness(it) },
                         onContrastChange = { editorViewModel.updateContrast(it) },
+                        onExposureChange = { editorViewModel.updateExposure(it) },
                         onExportVideo = {
                             val outputFile = File(
                                 context.cacheDir,
@@ -119,6 +120,7 @@ fun EditorScreen(
     uiState: EditorUiState,
     onBrightnessChange: (Float) -> Unit,
     onContrastChange: (Float) -> Unit,
+    onExposureChange: (Float) -> Unit,
     onExportVideo: () -> Unit,
     onBackClick: () -> Unit,
 ) {
@@ -212,6 +214,20 @@ fun EditorScreen(
                 value = uiState.effectSettings.contrast,
                 onValueChange = onContrastChange,
                 valueRange = 0f..2f,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.size(16.dp))
+
+            Text(
+                text = "Exposure: %.2f".format(uiState.effectSettings.exposure),
+                color = Color.White
+            )
+
+            Slider(
+                value = uiState.effectSettings.exposure,
+                onValueChange = onExposureChange,
+                valueRange = -2f..2f,
                 modifier = Modifier.fillMaxWidth()
             )
 
