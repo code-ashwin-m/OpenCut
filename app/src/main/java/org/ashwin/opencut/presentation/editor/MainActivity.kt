@@ -7,7 +7,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -76,46 +78,60 @@ fun EditorScreen(
     onBrightnessChange: (Float) -> Unit,
     onExportVideo: () -> Unit,
 ) {
-    Column(
+    Row(
         modifier = Modifier.fillMaxSize()
     ) {
+        // Left side: Preview (75%)
         AndroidView(
             factory = { previewView },
             modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
+                .fillMaxHeight()
+                .weight(0.75f)
         )
 
-        Text(
-            text = "Brightness: ${uiState.effectSettings.brightness}",
-            color = Color.White,
-            modifier = Modifier.padding(16.dp)
-        )
-
-        Slider(
-            value = uiState.effectSettings.brightness,
-            onValueChange = onBrightnessChange,
-            valueRange = -1f..1f,
-            modifier = Modifier.padding(16.dp)
-        )
-
-        Spacer(
-            modifier = Modifier.height(16.dp)
-        )
-
-        LinearProgressIndicator(
-            progress = { uiState.exportProgress },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Button(
-            onClick = onExportVideo,
-            enabled = !uiState.isExporting,
+        // Right side: Tools (25%)
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxHeight()
+                .weight(0.25f)
                 .padding(16.dp)
         ) {
-            Text(if (uiState.isExporting) "Exporting..." else "Export MP4")
+            Text(
+                text = "Tools",
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            Text(
+                text = "Brightness: %.2f".format(uiState.effectSettings.brightness),
+                color = Color.White
+            )
+
+            Slider(
+                value = uiState.effectSettings.brightness,
+                onValueChange = onBrightnessChange,
+                valueRange = -1f..1f,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            if (uiState.isExporting || uiState.exportProgress > 0f) {
+                LinearProgressIndicator(
+                    progress = { uiState.exportProgress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                )
+            }
+
+            Button(
+                onClick = onExportVideo,
+                enabled = !uiState.isExporting,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (uiState.isExporting) "Exporting..." else "Export MP4")
+            }
         }
     }
 }
