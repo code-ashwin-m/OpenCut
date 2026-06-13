@@ -172,4 +172,18 @@ implements GLSurfaceView.Renderer,
     public boolean isPlaying() {
         return mediaPlayer != null && mediaPlayer.isPlaying();
     }
+
+    public void release() {
+        if (mediaPlayer != null) {
+            try {
+                if (mediaPlayer.isPlaying()) {
+                    mediaPlayer.stop();
+                }
+                mediaPlayer.release();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            mediaPlayer = null;
+        }
+    }
 }

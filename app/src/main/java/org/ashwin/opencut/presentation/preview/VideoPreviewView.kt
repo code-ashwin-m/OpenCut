@@ -31,4 +31,8 @@ class VideoPreviewView(context: Context) : GLSurfaceView(context) {
     fun isPlaying(): Boolean {
         return renderer.isPlaying
     }
+
+    fun release() {
+        renderer.release()
+    }
 }

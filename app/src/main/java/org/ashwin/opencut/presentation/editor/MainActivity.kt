@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
@@ -22,6 +23,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -79,6 +81,12 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    DisposableEffect(Unit) {
+                        onDispose {
+                            previewView.release()
+                        }
+                    }
+
                     LaunchedEffect(uiState.effectSettings.brightness) {
                         previewView.setEffect(uiState.effectSettings)
                     }
@@ -93,6 +101,9 @@ class MainActivity : ComponentActivity() {
                                 "exported_video_tmp.mp4"
                             )
                             editorViewModel.startExport(inputUri, outputFile.absolutePath)
+                        },
+                        onBackClick = {
+                            navController.popBackStack()
                         }
                     )
                 }
@@ -107,6 +118,7 @@ fun EditorScreen(
     uiState: EditorUiState,
     onBrightnessChange: (Float) -> Unit,
     onExportVideo: () -> Unit,
+    onBackClick: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxSize()
@@ -157,11 +169,23 @@ fun EditorScreen(
                 .weight(0.25f)
                 .padding(16.dp)
         ) {
-            Text(
-                text = "Tools",
-                color = Color.White,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 16.dp)
-            )
+            ) {
+                IconButton(onClick = onBackClick) {
+                    Icon(
+                        imageVector = Icons.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(
+                    text = "Tools",
+                    color = Color.White
+                )
+            }
 
             Text(
                 text = "Brightness: %.2f".format(uiState.effectSettings.brightness),
