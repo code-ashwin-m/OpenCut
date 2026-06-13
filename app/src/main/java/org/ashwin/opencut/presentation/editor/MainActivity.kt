@@ -81,8 +81,26 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    DisposableEffect(Unit) {
+                    var isPlaying by remember { mutableStateOf(false) }
+
+                    val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+                    DisposableEffect(lifecycleOwner) {
+                        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                            when (event) {
+                                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> {
+                                    previewView.pausePlayback()
+                                    isPlaying = false
+                                    previewView.onPause()
+                                }
+                                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> {
+                                    previewView.onResume()
+                                }
+                                else -> {}
+                            }
+                        }
+                        lifecycleOwner.lifecycle.addObserver(observer)
                         onDispose {
+                            lifecycleOwner.lifecycle.removeObserver(observer)
                             previewView.release()
                         }
                     }
@@ -94,6 +112,11 @@ class MainActivity : ComponentActivity() {
                     EditorScreen(
                         previewView = previewView,
                         uiState = uiState,
+                        isPlaying = isPlaying,
+                        onPlayPauseToggle = {
+                            previewView.togglePlayback()
+                            isPlaying = previewView.isPlaying()
+                        },
                         onBrightnessChange = { editorViewModel.updateBrightness(it) },
                         onContrastChange = { editorViewModel.updateContrast(it) },
                         onExposureChange = { editorViewModel.updateExposure(it) },
@@ -118,6 +141,8 @@ class MainActivity : ComponentActivity() {
 fun EditorScreen(
     previewView: VideoPreviewView,
     uiState: EditorUiState,
+    isPlaying: Boolean,
+    onPlayPauseToggle: () -> Unit,
     onBrightnessChange: (Float) -> Unit,
     onContrastChange: (Float) -> Unit,
     onExposureChange: (Float) -> Unit,
@@ -140,8 +165,6 @@ fun EditorScreen(
                     .weight(1f)
             )
 
-            var isPlaying by remember { mutableStateOf(false) }
-
             // Transport Controls
             Row(
                 modifier = Modifier
@@ -151,10 +174,7 @@ fun EditorScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = {
-                        previewView.togglePlayback()
-                        isPlaying = previewView.isPlaying()
-                    }
+                    onClick = onPlayPauseToggle
                 ) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,

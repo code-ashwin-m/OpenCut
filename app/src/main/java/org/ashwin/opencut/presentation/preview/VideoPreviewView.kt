@@ -28,6 +28,10 @@ class VideoPreviewView(context: Context) : GLSurfaceView(context) {
         renderer.togglePlayback()
     }
 
+    fun pausePlayback() {
+        renderer.pausePlayback()
+    }
+
     fun isPlaying(): Boolean {
         return renderer.isPlaying
     }
