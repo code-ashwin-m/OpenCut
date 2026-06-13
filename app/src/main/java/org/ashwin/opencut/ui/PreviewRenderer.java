@@ -10,6 +10,7 @@ import android.opengl.Matrix;
 import android.util.Log;
 import android.view.Surface;
 
+import org.ashwin.opencut.core.EffectSettings;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -28,8 +29,6 @@ implements GLSurfaceView.Renderer,
     private MediaPlayer mediaPlayer;
 
     private Uri pendingVideoUri;
-    
-    private float brightness = 0f;
 
     private VideoShader videoShader;
 
@@ -40,6 +39,7 @@ implements GLSurfaceView.Renderer,
 
     private int videoWidth;
     private int videoHeight;
+    private EffectSettings effectSettings;
 
     public PreviewRenderer(Context context) {
         this.context = context;
@@ -132,7 +132,7 @@ implements GLSurfaceView.Renderer,
             frameAvailable = false;
         }
 
-        videoShader.draw(textureId, brightness, mvpMatrix);
+        videoShader.draw(textureId, effectSettings, mvpMatrix);
     }
 
     public void loadVideo(Uri uri) {
@@ -171,8 +171,8 @@ implements GLSurfaceView.Renderer,
         }
     }
 
-    public void setBrightness(float value) {
-        this.brightness = value;
+    public void setEffect(EffectSettings effectSettings) {
+        this.effectSettings = effectSettings;
     }
 
     private void initPlayer() {
@@ -185,4 +185,5 @@ implements GLSurfaceView.Renderer,
 
         mediaPlayer.setSurface(surface);
     }
+
 }

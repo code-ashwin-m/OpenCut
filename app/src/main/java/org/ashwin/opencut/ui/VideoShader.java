@@ -4,6 +4,8 @@ import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.util.Log;
 
+import org.ashwin.opencut.core.EffectSettings;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
@@ -137,7 +139,7 @@ public class VideoShader {
 
     public void draw(
             int textureId,
-            float brightness,
+            EffectSettings effectSettings,
             float[] mvpMatrix) {
 
         GLES20.glUseProgram(program);
@@ -196,7 +198,7 @@ public class VideoShader {
 
         GLES20.glUniform1f(
                 brightnessHandle,
-                brightness
+                effectSettings.brightness
         );
 
         GLES20.glDrawArrays(

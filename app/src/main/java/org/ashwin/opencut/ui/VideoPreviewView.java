@@ -3,6 +3,9 @@ package org.ashwin.opencut.ui;
 import android.content.Context;
 import android.net.Uri;
 import android.opengl.GLSurfaceView;
+
+import org.ashwin.opencut.core.EffectSettings;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class VideoPreviewView extends GLSurfaceView {
@@ -25,7 +28,7 @@ public class VideoPreviewView extends GLSurfaceView {
         renderer.loadVideo(uri);
     }
 
-    public void setBrightness(float value){
-        renderer.setBrightness(value);
+    public void setEffect(EffectSettings effectSettings) {
+        renderer.setEffect(effectSettings);
     }
 }
