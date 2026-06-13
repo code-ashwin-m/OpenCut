@@ -148,13 +148,11 @@ implements GLSurfaceView.Renderer,
     }
 
     private void initPlayer() {
-        if (mediaPlayer != null)
-            return;
-
-        mediaPlayer = new MediaPlayer();
+        if (mediaPlayer == null) {
+            mediaPlayer = new MediaPlayer();
+        }
 
         Surface surface = new Surface(surfaceTexture);
-
         mediaPlayer.setSurface(surface);
     }
 
