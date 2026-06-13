@@ -1,4 +1,4 @@
-package org.ashwin.opencut
+package org.ashwin.opencut.presentation.editor;
 
 import android.net.Uri
 import android.os.Bundle
@@ -26,11 +26,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import org.ashwin.opencut.core.EffectSettings
-import org.ashwin.opencut.export.ExportCallback
-import org.ashwin.opencut.export.VideoExporter
-import org.ashwin.opencut.ui.EditorViewModel
-import org.ashwin.opencut.ui.VideoPreviewView
+import org.ashwin.opencut.R
+import org.ashwin.opencut.domain.model.EffectSettings
+import org.ashwin.opencut.data.media.ExportCallback
+import org.ashwin.opencut.data.media.VideoExporter
+import org.ashwin.opencut.presentation.editor.EditorViewModel
+import org.ashwin.opencut.presentation.preview.VideoPreviewView
 import java.io.File
 
 class MainActivity : ComponentActivity() {

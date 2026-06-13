@@ -1,4 +1,4 @@
-package org.ashwin.opencut.ui;
+package org.ashwin.opencut.data.media;
 
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;

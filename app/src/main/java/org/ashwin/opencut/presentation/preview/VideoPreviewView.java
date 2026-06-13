@@ -1,10 +1,11 @@
-package org.ashwin.opencut.ui;
+package org.ashwin.opencut.presentation.preview;
 
 import android.content.Context;
 import android.net.Uri;
 import android.opengl.GLSurfaceView;
 
-import org.ashwin.opencut.core.EffectSettings;
+import org.ashwin.opencut.data.media.PreviewRenderer;
+import org.ashwin.opencut.domain.model.EffectSettings;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

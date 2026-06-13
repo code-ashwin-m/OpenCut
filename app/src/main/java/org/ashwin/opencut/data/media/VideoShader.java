@@ -1,10 +1,10 @@
-package org.ashwin.opencut.ui;
+package org.ashwin.opencut.data.media;
 
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.util.Log;
 
-import org.ashwin.opencut.core.EffectSettings;
+import org.ashwin.opencut.domain.model.EffectSettings;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

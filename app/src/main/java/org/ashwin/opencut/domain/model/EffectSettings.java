@@ -1,4 +1,4 @@
-package org.ashwin.opencut.core;
+package org.ashwin.opencut.domain.model;
 
 public class EffectSettings {
     public float brightness = 0f;

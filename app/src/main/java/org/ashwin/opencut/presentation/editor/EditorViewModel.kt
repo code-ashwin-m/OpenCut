@@ -1,4 +1,4 @@
-package org.ashwin.opencut.ui
+package org.ashwin.opencut.presentation.editor;
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf

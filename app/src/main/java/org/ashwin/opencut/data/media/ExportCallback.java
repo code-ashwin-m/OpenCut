@@ -1,4 +1,4 @@
-package org.ashwin.opencut.export;
+package org.ashwin.opencut.data.media;
 
 public interface ExportCallback {
     void onProgress(

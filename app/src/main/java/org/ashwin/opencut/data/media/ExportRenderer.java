@@ -1,8 +1,8 @@
-package org.ashwin.opencut.export;
+package org.ashwin.opencut.data.media;
 import android.opengl.GLES20;
 
-import org.ashwin.opencut.core.EffectSettings;
-import org.ashwin.opencut.ui.VideoShader;
+import org.ashwin.opencut.domain.model.EffectSettings;
+import org.ashwin.opencut.data.media.VideoShader;
 
 public class ExportRenderer {
     private int width;

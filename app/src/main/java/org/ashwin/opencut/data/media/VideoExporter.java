@@ -1,4 +1,4 @@
-package org.ashwin.opencut.export;
+package org.ashwin.opencut.data.media;
 
 import android.content.Context;
 import android.media.MediaCodec;
@@ -9,7 +9,7 @@ import android.media.MediaMuxer;
 import android.net.Uri;
 import android.util.Log;
 
-import org.ashwin.opencut.core.EffectSettings;
+import org.ashwin.opencut.domain.model.EffectSettings;
 
 import java.nio.ByteBuffer;
 
@@ -180,18 +180,6 @@ public class VideoExporter {
                 null,
                 MediaCodec.CONFIGURE_FLAG_ENCODE
         );
-
-        // Professional pipeline starts here:
-        //
-        // InputSurface
-        // OutputSurface
-        // EGL Context
-        // OpenGL Renderer
-        // Decoder Loop
-        // Encoder Loop
-        // MediaMuxer
-        //
-        // omitted here
 
         EglCore eglCore = new EglCore(null, EglCore.FLAG_RECORDABLE);
 

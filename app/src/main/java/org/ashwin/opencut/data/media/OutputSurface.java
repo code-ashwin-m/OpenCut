@@ -1,11 +1,11 @@
-package org.ashwin.opencut.export;
+package org.ashwin.opencut.data.media;
 
 import android.graphics.SurfaceTexture;
 import android.util.Log;
 import android.view.Surface;
 
-import org.ashwin.opencut.core.EffectSettings;
-import org.ashwin.opencut.ui.GLUtils;
+import org.ashwin.opencut.domain.model.EffectSettings;
+import org.ashwin.opencut.data.media.GLUtils;
 
 public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener{
     private SurfaceTexture surfaceTexture;

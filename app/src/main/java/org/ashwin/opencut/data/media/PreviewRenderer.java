@@ -1,4 +1,4 @@
-package org.ashwin.opencut.ui;
+package org.ashwin.opencut.data.media;
 
 import android.content.Context;
 import android.graphics.SurfaceTexture;
@@ -10,7 +10,7 @@ import android.opengl.Matrix;
 import android.util.Log;
 import android.view.Surface;
 
-import org.ashwin.opencut.core.EffectSettings;
+import org.ashwin.opencut.domain.model.EffectSettings;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
