@@ -136,7 +136,7 @@ fun EditorScreen(
                     .weight(1f)
             )
 
-            var isPlaying by remember { mutableStateOf(true) }
+            var isPlaying by remember { mutableStateOf(false) }
 
             // Transport Controls
             Row(

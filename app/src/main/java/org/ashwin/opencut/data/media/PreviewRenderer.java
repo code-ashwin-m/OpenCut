@@ -138,7 +138,6 @@ implements GLSurfaceView.Renderer,
             videoHeight = mediaPlayer.getVideoHeight();
             aspectNeedsUpdate = true;
             mediaPlayer.setLooping(true);
-            mediaPlayer.start();
         } catch (Exception e) {
             e.printStackTrace();
         }
