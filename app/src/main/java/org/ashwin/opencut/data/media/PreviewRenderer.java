@@ -195,6 +195,38 @@ implements GLSurfaceView.Renderer,
         return mediaPlayer != null && mediaPlayer.isPlaying();
     }
 
+    public void seekTo(int positionMs) {
+        if (mediaPlayer != null) {
+            try {
+                mediaPlayer.seekTo(positionMs);
+            } catch (IllegalStateException e) {
+                Log.e("PreviewRenderer", "Error seeking MediaPlayer: " + e.getMessage());
+            }
+        }
+    }
+
+    public int getCurrentPosition() {
+        if (mediaPlayer != null) {
+            try {
+                return mediaPlayer.getCurrentPosition();
+            } catch (IllegalStateException e) {
+                Log.e("PreviewRenderer", "Error getting position: " + e.getMessage());
+            }
+        }
+        return 0;
+    }
+
+    public int getDuration() {
+        if (mediaPlayer != null) {
+            try {
+                return mediaPlayer.getDuration();
+            } catch (IllegalStateException e) {
+                Log.e("PreviewRenderer", "Error getting duration: " + e.getMessage());
+            }
+        }
+        return 0;
+    }
+
     public void release() {
         NativeEngineBridge.INSTANCE.nativeReleaseRenderer();
         if (mediaPlayer != null) {

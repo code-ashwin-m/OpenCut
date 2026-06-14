@@ -22,6 +22,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import org.ashwin.opencut.presentation.components.TimelineView
+import org.ashwin.opencut.presentation.components.TimelineTrackState
+import org.ashwin.opencut.presentation.components.TimelineTrackType
+import org.ashwin.opencut.presentation.components.TimelineClipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -82,6 +90,9 @@ class MainActivity : ComponentActivity() {
                     }
 
                     var isPlaying by remember { mutableStateOf(false) }
+                    var currentPositionMs by remember { mutableStateOf(0L) }
+                    var totalDurationMs by remember { mutableStateOf(0L) }
+                    var isSeeking by remember { mutableStateOf(false) }
 
                     val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
                     DisposableEffect(lifecycleOwner) {
@@ -109,10 +120,42 @@ class MainActivity : ComponentActivity() {
                         previewView.setEffect(uiState.effectSettings)
                     }
 
+                    LaunchedEffect(isPlaying, isSeeking) {
+                        if (!isSeeking) {
+                            while (true) {
+                                val duration = previewView.getDuration()
+                                if (duration > 0) {
+                                    totalDurationMs = duration.toLong()
+                                }
+                                currentPositionMs = previewView.getCurrentPosition().toLong()
+                                val activePlaying = previewView.isPlaying()
+                                if (activePlaying != isPlaying) {
+                                    isPlaying = activePlaying
+                                }
+                                kotlinx.coroutines.delay(50)
+                            }
+                        }
+                    }
+
                     EditorScreen(
                         previewView = previewView,
                         uiState = uiState,
                         isPlaying = isPlaying,
+                        currentPositionMs = currentPositionMs,
+                        totalDurationMs = totalDurationMs,
+                        onSeek = { position ->
+                            currentPositionMs = position
+                            previewView.seekTo(position.toInt())
+                        },
+                        onSeekStart = {
+                            isSeeking = true
+                            previewView.pausePlayback()
+                            isPlaying = false
+                        },
+                        onSeekEnd = {
+                            isSeeking = false
+                            previewView.seekTo(currentPositionMs.toInt())
+                        },
                         onPlayPauseToggle = {
                             previewView.togglePlayback()
                             isPlaying = previewView.isPlaying()
@@ -144,6 +187,11 @@ fun EditorScreen(
     previewView: VideoPreviewView,
     uiState: EditorUiState,
     isPlaying: Boolean,
+    currentPositionMs: Long,
+    totalDurationMs: Long,
+    onSeek: (Long) -> Unit,
+    onSeekStart: () -> Unit,
+    onSeekEnd: () -> Unit,
     onPlayPauseToggle: () -> Unit,
     onBrightnessChange: (Float) -> Unit,
     onContrastChange: (Float) -> Unit,
@@ -153,154 +201,212 @@ fun EditorScreen(
     onExportVideo: () -> Unit,
     onBackClick: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxSize()
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF121212))
     ) {
-        // Left side: Preview (75%)
-        Column(
+        // Upper part: Preview & Tools side-by-side
+        Row(
             modifier = Modifier
-                .fillMaxHeight()
-                .weight(0.75f)
+                .fillMaxWidth()
+                .weight(0.7f)
         ) {
-            AndroidView(
-                factory = { previewView },
+            // Left side: Preview (75%)
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            )
-
-            // Transport Controls
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxHeight()
+                    .weight(0.75f)
             ) {
-                IconButton(
-                    onClick = onPlayPauseToggle
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            }
-        }
-
-        // Right side: Tools (25%)
-        Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .weight(0.25f)
-                .padding(16.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(bottom = 16.dp)
-            ) {
-                IconButton(onClick = onBackClick) {
-                    Icon(
-                        imageVector = Icons.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White
-                    )
-                }
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = "Tools",
-                    color = Color.White
-                )
-            }
-
-            Text(
-                text = "Brightness: %.2f".format(uiState.effectSettings.brightness),
-                color = Color.White
-            )
-
-            Slider(
-                value = uiState.effectSettings.brightness,
-                onValueChange = onBrightnessChange,
-                valueRange = -1f..1f,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.size(16.dp))
-
-            Text(
-                text = "Contrast: %.2f".format(uiState.effectSettings.contrast),
-                color = Color.White
-            )
-
-            Slider(
-                value = uiState.effectSettings.contrast,
-                onValueChange = onContrastChange,
-                valueRange = 0f..2f,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.size(16.dp))
-
-            Text(
-                text = "Exposure: %.2f".format(uiState.effectSettings.exposure),
-                color = Color.White
-            )
-
-            Slider(
-                value = uiState.effectSettings.exposure,
-                onValueChange = onExposureChange,
-                valueRange = -2f..2f,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.size(16.dp))
-
-            Text(
-                text = "Highlights: %.2f".format(uiState.effectSettings.highlights),
-                color = Color.White
-            )
-
-            Slider(
-                value = uiState.effectSettings.highlights,
-                onValueChange = onHighlightsChange,
-                valueRange = -1f..1f,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.size(16.dp))
-
-            Text(
-                text = "Shadows: %.2f".format(uiState.effectSettings.shadows),
-                color = Color.White
-            )
-
-            Slider(
-                value = uiState.effectSettings.shadows,
-                onValueChange = onShadowsChange,
-                valueRange = -1f..1f,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            if (uiState.isExporting || uiState.exportProgress > 0f) {
-                LinearProgressIndicator(
-                    progress = { uiState.exportProgress },
+                AndroidView(
+                    factory = { previewView },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 8.dp)
+                        .weight(1f)
                 )
+
+                // Transport Controls
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp),
+                    horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = onPlayPauseToggle
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause" else "Play",
+                            tint = Color.White,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+
+                    val currentSec = currentPositionMs / 1000
+                    val totalSec = totalDurationMs / 1000
+                    Spacer(modifier = Modifier.size(16.dp))
+                    Text(
+                        text = String.format("%d:%02d / %d:%02d", currentSec / 60, currentSec % 60, totalSec / 60, totalSec % 60),
+                        color = Color.LightGray,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
 
-            Button(
-                onClick = onExportVideo,
-                enabled = !uiState.isExporting,
-                modifier = Modifier.fillMaxWidth()
+            // Right side: Tools (25%)
+            Column(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .weight(0.25f)
+                    .padding(16.dp)
+                    .background(Color(0xFF1E1E1E))
             ) {
-                Text(if (uiState.isExporting) "Exporting..." else "Export MP4")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            imageVector = Icons.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Text(
+                        text = "Tools",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = "Brightness: %.2f".format(uiState.effectSettings.brightness),
+                        color = Color.White
+                    )
+
+                    Slider(
+                        value = uiState.effectSettings.brightness,
+                        onValueChange = onBrightnessChange,
+                        valueRange = -1f..1f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.size(16.dp))
+
+                    Text(
+                        text = "Contrast: %.2f".format(uiState.effectSettings.contrast),
+                        color = Color.White
+                    )
+
+                    Slider(
+                        value = uiState.effectSettings.contrast,
+                        onValueChange = onContrastChange,
+                        valueRange = 0f..2f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.size(16.dp))
+
+                    Text(
+                        text = "Exposure: %.2f".format(uiState.effectSettings.exposure),
+                        color = Color.White
+                    )
+
+                    Slider(
+                        value = uiState.effectSettings.exposure,
+                        onValueChange = onExposureChange,
+                        valueRange = -2f..2f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.size(16.dp))
+
+                    Text(
+                        text = "Highlights: %.2f".format(uiState.effectSettings.highlights),
+                        color = Color.White
+                    )
+
+                    Slider(
+                        value = uiState.effectSettings.highlights,
+                        onValueChange = onHighlightsChange,
+                        valueRange = -1f..1f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.size(16.dp))
+
+                    Text(
+                        text = "Shadows: %.2f".format(uiState.effectSettings.shadows),
+                        color = Color.White
+                    )
+
+                    Slider(
+                        value = uiState.effectSettings.shadows,
+                        onValueChange = onShadowsChange,
+                        valueRange = -1f..1f,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Spacer(modifier = Modifier.size(16.dp))
+
+                if (uiState.isExporting || uiState.exportProgress > 0f) {
+                    LinearProgressIndicator(
+                        progress = { uiState.exportProgress },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                    )
+                }
+
+                Button(
+                    onClick = onExportVideo,
+                    enabled = !uiState.isExporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (uiState.isExporting) "Exporting..." else "Export MP4")
+                }
             }
         }
+
+        // Lower part: Timeline
+        val timelineTracks = remember(totalDurationMs) {
+            listOf(
+                TimelineTrackState(
+                    id = "video-track-1",
+                    name = "Video Track 1",
+                    type = TimelineTrackType.VIDEO,
+                    clips = listOf(
+                        TimelineClipState(
+                            id = "clip-1",
+                            title = "sample.mp4",
+                            startMs = 0L,
+                            durationMs = totalDurationMs
+                        )
+                    )
+                )
+            )
+        }
+
+        TimelineView(
+            tracks = timelineTracks,
+            currentPositionMs = currentPositionMs,
+            totalDurationMs = totalDurationMs,
+            onSeek = onSeek,
+            onSeekStart = onSeekStart,
+            onSeekEnd = onSeekEnd,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(0.3f)
+        )
     }
 }

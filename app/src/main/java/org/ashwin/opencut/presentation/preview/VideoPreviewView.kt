@@ -36,6 +36,18 @@ class VideoPreviewView(context: Context) : GLSurfaceView(context) {
         return renderer.isPlaying
     }
 
+    fun seekTo(positionMs: Int) {
+        renderer.seekTo(positionMs)
+    }
+
+    fun getCurrentPosition(): Int {
+        return renderer.currentPosition
+    }
+
+    fun getDuration(): Int {
+        return renderer.duration
+    }
+
     fun release() {
         renderer.release()
     }
