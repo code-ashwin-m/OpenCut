@@ -54,6 +54,7 @@ public class PreviewRenderer
         frameAvailable = true;
     }
 
+
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         textureId = GLUtils.createOESTexture();
