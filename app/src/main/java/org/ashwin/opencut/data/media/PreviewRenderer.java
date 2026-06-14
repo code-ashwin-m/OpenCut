@@ -20,7 +20,7 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 public class PreviewRenderer
-implements GLSurfaceView.Renderer,
+        implements GLSurfaceView.Renderer,
         SurfaceTexture.OnFrameAvailableListener {
 
     private final Context context;
@@ -54,6 +54,7 @@ implements GLSurfaceView.Renderer,
         frameAvailable = true;
     }
 
+
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         textureId = GLUtils.createOESTexture();
@@ -64,11 +65,11 @@ implements GLSurfaceView.Renderer,
 
         if (effectSettings != null) {
             NativeEngineBridge.INSTANCE.nativeSetEffects(
-                effectSettings.brightness,
-                effectSettings.contrast,
-                effectSettings.exposure,
-                effectSettings.highlights,
-                effectSettings.shadows
+                    effectSettings.brightness,
+                    effectSettings.contrast,
+                    effectSettings.exposure,
+                    effectSettings.highlights,
+                    effectSettings.shadows
             );
         }
         NativeEngineBridge.INSTANCE.nativeInitRenderer();
@@ -157,11 +158,11 @@ implements GLSurfaceView.Renderer,
         this.effectSettings = effectSettings;
         if (effectSettings != null) {
             NativeEngineBridge.INSTANCE.nativeSetEffects(
-                effectSettings.brightness,
-                effectSettings.contrast,
-                effectSettings.exposure,
-                effectSettings.highlights,
-                effectSettings.shadows
+                    effectSettings.brightness,
+                    effectSettings.contrast,
+                    effectSettings.exposure,
+                    effectSettings.highlights,
+                    effectSettings.shadows
             );
         }
     }
