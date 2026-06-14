@@ -63,7 +63,7 @@ fun TimelineView(
     val rulerHeight = 35.dp
     val trackHeight = 60.dp
     val trackGap = 8.dp
-
+    
     val textPaint = remember {
         android.graphics.Paint().apply {
             isAntiAlias = true
@@ -71,7 +71,7 @@ fun TimelineView(
             typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         }
     }
-
+    
     val clipTextPaint = remember {
         android.graphics.Paint().apply {
             isAntiAlias = true
@@ -95,7 +95,7 @@ fun TimelineView(
         }
 
         val trackWidth = width - (2f * paddingPx)
-
+        
         // Track the current position using rememberUpdatedState to avoid cancelling the pointerInput coroutine
         val currentPositionState = rememberUpdatedState(currentPositionMs)
 
@@ -104,19 +104,19 @@ fun TimelineView(
                 .fillMaxSize()
                 .pointerInput(totalDurationMs) {
                     if (totalDurationMs <= 0L) return@pointerInput
-
+                    
                     awaitPointerEventScope {
                         while (true) {
                             val down = awaitFirstDown()
                             try {
                                 onSeekStart()
-
+                                
                                 val activeTrackWidth = size.width - 2f * paddingPx
                                 if (activeTrackWidth > 0) {
                                     val fraction = ((down.position.x - paddingPx) / activeTrackWidth).coerceIn(0f, 1f)
                                     val targetTimeMs = (fraction * totalDurationMs.toFloat()).toLong()
                                     onSeek(targetTimeMs)
-
+                                    
                                     drag(down.id) { change ->
                                         val dragFraction = ((change.position.x - paddingPx) / activeTrackWidth).coerceIn(0f, 1f)
                                         val dragTimeMs = (dragFraction * totalDurationMs.toFloat()).toLong()
@@ -132,7 +132,7 @@ fun TimelineView(
                 }
         ) {
             if (trackWidth <= 0) return@Canvas
-
+            
             // Draw Ruler Line & Ticks
             val rulerY = rulerHeight.toPx()
             drawLine(
@@ -150,23 +150,23 @@ fun TimelineView(
                 totalSeconds <= 300 -> 30
                 else -> 60
             }
-
+            
             textPaint.textSize = 10.dp.toPx()
-
+            
             for (s in 0..max(totalSeconds, 1) step tickInterval) {
                 val fraction = if (totalSeconds > 0) s.toFloat() / totalSeconds.toFloat() else 0f
                 val tickX = paddingPx + fraction * trackWidth
-
+                
                 val isMajorTick = s % (tickInterval * 2) == 0 || s == 0 || s == totalSeconds
                 val tickLength = if (isMajorTick) 12.dp.toPx() else 6.dp.toPx()
-
+                
                 drawLine(
                     color = if (isMajorTick) Color(0xFF88888C) else Color(0xFF444448),
                     start = Offset(tickX, rulerY - tickLength),
                     end = Offset(tickX, rulerY),
                     strokeWidth = (if (isMajorTick) 1.5f else 1f).dp.toPx()
                 )
-
+                
                 if (isMajorTick) {
                     val minutes = s / 60
                     val seconds = s % 60
@@ -183,10 +183,10 @@ fun TimelineView(
             // Draw Tracks & Clips
             val trackGapPx = trackGap.toPx()
             val trackHeightPx = trackHeight.toPx()
-
+            
             tracks.forEachIndexed { index, track ->
                 val trackY = rulerY + trackGapPx + index.toFloat() * (trackHeightPx + trackGapPx)
-
+                
                 // Draw Track Lane Background representing the video duration (spanning full trackWidth)
                 drawRoundRect(
                     color = Color(0xFF1E1E22),
@@ -199,10 +199,10 @@ fun TimelineView(
                 track.clips.forEach { clip ->
                     val clipStartFraction = if (totalDurationMs > 0L) clip.startMs.toFloat() / totalDurationMs.toFloat() else 0f
                     val clipDurationFraction = if (totalDurationMs > 0L) clip.durationMs.toFloat() / totalDurationMs.toFloat() else 1f
-
+                    
                     val clipStartX = paddingPx + clipStartFraction * trackWidth
                     val clipWidth = clipDurationFraction * trackWidth
-
+                    
                     if (clipWidth > 0) {
                         // Draw Clip background gradient
                         drawRoundRect(
@@ -213,7 +213,7 @@ fun TimelineView(
                             size = Size(clipWidth, trackHeightPx),
                             cornerRadius = CornerRadius(6.dp.toPx())
                         )
-
+                        
                         // Draw Clip thin border highlight
                         drawRoundRect(
                             color = Color(0x60FFFFFF),
@@ -226,10 +226,10 @@ fun TimelineView(
                         // Draw Clip title text (clipped)
                         clipTextPaint.textSize = 11.dp.toPx()
                         val textPaddingPx = 10.dp.toPx()
-
+                        
                         if (clipWidth > textPaddingPx * 2) {
                             val textY = trackY + (trackHeightPx / 2f) - ((clipTextPaint.descent() + clipTextPaint.ascent()) / 2f)
-
+                            
                             drawContext.canvas.save()
                             val clipPath = Path().apply {
                                 addRoundRect(
@@ -243,14 +243,14 @@ fun TimelineView(
                                 )
                             }
                             drawContext.canvas.clipPath(clipPath)
-
+                            
                             drawContext.canvas.nativeCanvas.drawText(
                                 clip.title,
                                 clipStartX + textPaddingPx,
                                 textY,
                                 clipTextPaint
                             )
-
+                            
                             drawContext.canvas.restore()
                         }
                     }
@@ -261,7 +261,7 @@ fun TimelineView(
             val playheadColor = Color(0xFF00E5FF) // Cyber neon cyan playhead
             val playheadFraction = if (totalDurationMs > 0L) currentPositionMs.toFloat() / totalDurationMs.toFloat() else 0f
             val playheadX = paddingPx + playheadFraction * trackWidth
-
+            
             // Playhead Line
             drawLine(
                 color = playheadColor,
@@ -269,7 +269,7 @@ fun TimelineView(
                 end = Offset(playheadX, size.height),
                 strokeWidth = 2.dp.toPx()
             )
-
+            
             // Playhead Handle (inverted pentagon shield at the top)
             val handleWidth = 14.dp.toPx()
             val handleHeight = 22.dp.toPx()
@@ -282,7 +282,7 @@ fun TimelineView(
                 close()
             }
             drawPath(handlePath, color = playheadColor)
-
+            
             // Playhead glowing center dot
             drawCircle(
                 color = Color.White,
