@@ -20,7 +20,7 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 public class PreviewRenderer
-implements GLSurfaceView.Renderer,
+        implements GLSurfaceView.Renderer,
         SurfaceTexture.OnFrameAvailableListener {
 
     private final Context context;
@@ -64,11 +64,11 @@ implements GLSurfaceView.Renderer,
 
         if (effectSettings != null) {
             NativeEngineBridge.INSTANCE.nativeSetEffects(
-                effectSettings.brightness,
-                effectSettings.contrast,
-                effectSettings.exposure,
-                effectSettings.highlights,
-                effectSettings.shadows
+                    effectSettings.brightness,
+                    effectSettings.contrast,
+                    effectSettings.exposure,
+                    effectSettings.highlights,
+                    effectSettings.shadows
             );
         }
         NativeEngineBridge.INSTANCE.nativeInitRenderer();
@@ -157,11 +157,11 @@ implements GLSurfaceView.Renderer,
         this.effectSettings = effectSettings;
         if (effectSettings != null) {
             NativeEngineBridge.INSTANCE.nativeSetEffects(
-                effectSettings.brightness,
-                effectSettings.contrast,
-                effectSettings.exposure,
-                effectSettings.highlights,
-                effectSettings.shadows
+                    effectSettings.brightness,
+                    effectSettings.contrast,
+                    effectSettings.exposure,
+                    effectSettings.highlights,
+                    effectSettings.shadows
             );
         }
     }
@@ -193,6 +193,38 @@ implements GLSurfaceView.Renderer,
 
     public boolean isPlaying() {
         return mediaPlayer != null && mediaPlayer.isPlaying();
+    }
+
+    public void seekTo(int positionMs) {
+        if (mediaPlayer != null) {
+            try {
+                mediaPlayer.seekTo(positionMs);
+            } catch (IllegalStateException e) {
+                Log.e("PreviewRenderer", "Error seeking MediaPlayer: " + e.getMessage());
+            }
+        }
+    }
+
+    public int getCurrentPosition() {
+        if (mediaPlayer != null) {
+            try {
+                return mediaPlayer.getCurrentPosition();
+            } catch (IllegalStateException e) {
+                Log.e("PreviewRenderer", "Error getting position: " + e.getMessage());
+            }
+        }
+        return 0;
+    }
+
+    public int getDuration() {
+        if (mediaPlayer != null) {
+            try {
+                return mediaPlayer.getDuration();
+            } catch (IllegalStateException e) {
+                Log.e("PreviewRenderer", "Error getting duration: " + e.getMessage());
+            }
+        }
+        return 0;
     }
 
     public void release() {
