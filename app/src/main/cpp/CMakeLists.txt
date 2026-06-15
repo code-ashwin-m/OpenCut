@@ -11,6 +11,13 @@ cmake_minimum_required(VERSION 3.22.1)
 # build script scope).
 project("opencut")
 
+# Find and load library modules for hardware-accelerated rendering
+find_library(log-lib log)
+find_library(android-lib android)
+find_library(gles3-lib GLESv3)
+find_library(egl-lib EGL)
+find_library(mediandk-lib mediandk)
+
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
 # You can define multiple libraries, and CMake builds them for you.
@@ -26,7 +33,16 @@ project("opencut")
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        native-lib.cpp
+        engine/render/VideoRenderer.cpp
+        engine/decoder/VideoDecoder.cpp         # From previous phase
+        engine/adjustment/VideoShader.cpp       # New Shader module
+        engine/resolver/TimelineResolver.cpp  # Added Resolver
+)
+
+# Includes path mappings
+target_include_directories(
+        ${CMAKE_PROJECT_NAME} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/engine
 )
 
 # Specifies libraries CMake should link to your target library. You
@@ -35,4 +51,11 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
 target_link_libraries(${CMAKE_PROJECT_NAME}
         # List libraries link to the target library
         android
-        log)
+        log
+        ${log-lib}
+        ${android-lib}
+        ${gles3-lib}
+        ${egl-lib}
+        ${mediandk-lib}
+        mediandk # <- CRITICAL: Enables access to the native MediaCodec & Extractor APIs
+)
