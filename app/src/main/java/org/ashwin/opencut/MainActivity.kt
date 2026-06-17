@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileWriter
@@ -43,7 +45,8 @@ data class Project(
     val name: String,
     val createdAt: Long,
     val aspectRatio: String, // e.g., "16:9", "9:16", "1:1"
-    val videoUri: String? = null // Now stores the direct content:// URI string (No file copying!)
+    val videoUri: String? = null, // The currently active/selected video asset URI
+    val assets: List<String> = emptyList() // The list of all imported assets for this project
 )
 
 // --- Navigation States ---
@@ -65,7 +68,7 @@ class MainActivity : ComponentActivity() {
     private var currentScreen by mutableStateOf<Screen>(Screen.ProjectsList)
     private val projectsList = mutableStateListOf<Project>()
 
-    // Launcher configured to request a persistent virtual file path (URI)
+    // Launcher configured to request a persistent virtual file path (URI) and import it to the Asset Panel
     private val selectVideoLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri?.let { videoUri ->
             val screen = currentScreen
@@ -75,21 +78,35 @@ class MainActivity : ComponentActivity() {
                     val takeFlags: Int = Intent.FLAG_GRANT_READ_URI_PERMISSION
                     contentResolver.takePersistableUriPermission(videoUri, takeFlags)
 
-                    currentFd?.close()
-                    currentFd = contentResolver.openFileDescriptor(videoUri, "r")
-                    currentFd?.let { pfd ->
-                        // 2. Pass the raw file descriptor integer directly to C++
-                        nativeEngine.setDataSource(pfd.fd)
-                        isMediaAccessible = true
-
-                        // 3. Save only the URI string to JSON (Uses 0 bytes of extra storage!)
-                        val updatedProject = screen.project.copy(videoUri = videoUri.toString())
-                        saveProjectToFile(this@MainActivity, updatedProject)
-
-                        // 4. Update UI states
-                        currentScreen = Screen.Editor(updatedProject)
-                        refreshProjectsList(this@MainActivity)
+                    val uriString = videoUri.toString()
+                    val currentAssets = screen.project.assets.toMutableList()
+                    if (!currentAssets.contains(uriString)) {
+                        currentAssets.add(uriString)
                     }
+
+                    // If no asset was previously active, make this newly imported one the active selection
+                    val activeUri = screen.project.videoUri ?: uriString
+
+                    val updatedProject = screen.project.copy(
+                        videoUri = activeUri,
+                        assets = currentAssets
+                    )
+
+                    // If setting active for the first time, immediately pass the raw file descriptor to C++
+                    if (screen.project.videoUri == null) {
+                        currentFd?.close()
+                        currentFd = contentResolver.openFileDescriptor(videoUri, "r")
+                        currentFd?.let { pfd ->
+                            nativeEngine.setDataSource(pfd.fd)
+                        }
+                        isMediaAccessible = true
+                    }
+
+                    // Save the updated asset array and update states
+                    saveProjectToFile(this@MainActivity, updatedProject)
+                    currentScreen = Screen.Editor(updatedProject)
+                    refreshProjectsList(this@MainActivity)
+
                 } catch (e: Exception) {
                     e.printStackTrace()
                     isMediaAccessible = false
@@ -190,6 +207,11 @@ class MainActivity : ComponentActivity() {
                 put("createdAt", project.createdAt)
                 put("aspectRatio", project.aspectRatio)
                 put("videoUri", project.videoUri ?: JSONObject.NULL)
+
+                // Save the assets list as a JSON array
+                val assetsArray = JSONArray()
+                project.assets.forEach { assetsArray.put(it) }
+                put("assets", assetsArray)
             }
             FileWriter(file).use { writer ->
                 writer.write(json.toString(4))
@@ -207,12 +229,30 @@ class MainActivity : ComponentActivity() {
             try {
                 val content = file.readText()
                 val json = JSONObject(content)
+
+                // Parse assets list
+                val assetsList = mutableListOf<String>()
+                if (json.has("assets")) {
+                    val arr = json.getJSONArray("assets")
+                    for (i in 0 until arr.length()) {
+                        assetsList.add(arr.getString(i))
+                    }
+                }
+
+                val videoUri = if (json.isNull("videoUri")) null else json.getString("videoUri")
+
+                // Backwards compatibility safeguard: If assets is empty but a single video was attached
+                if (assetsList.isEmpty() && videoUri != null) {
+                    assetsList.add(videoUri)
+                }
+
                 val project = Project(
                     id = json.getString("id"),
                     name = json.getString("name"),
                     createdAt = json.getLong("createdAt"),
                     aspectRatio = json.getString("aspectRatio"),
-                    videoUri = if (json.isNull("videoUri")) null else json.getString("videoUri")
+                    videoUri = videoUri,
+                    assets = assetsList
                 )
                 projectsList.add(project)
             } catch (e: Exception) {
@@ -329,7 +369,7 @@ class MainActivity : ComponentActivity() {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Aspect Ratio: ${project.aspectRatio}",
+                        text = "Aspect Ratio: ${project.aspectRatio} | Assets: ${project.assets.size}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.LightGray
                     )
@@ -419,92 +459,218 @@ class MainActivity : ComponentActivity() {
                 )
             }
         ) { paddingValues ->
-            Column(
+            // Tablet layout: horizontal split. Left side is the Asset Panel; Right side is the Previewer & Controls
+            Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                // Video Preview Area
-                Box(
+                // --- ASSET PANEL SIDEBAR ---
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .background(Color.Black),
-                    contentAlignment = Alignment.Center
+                        .width(320.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.surfaceColorAtElevation(1.dp))
+                        .padding(16.dp)
                 ) {
-                    if (isMediaAccessible) {
-                        AndroidView(
-                            factory = { ctx ->
-                                SurfaceView(ctx).apply {
-                                    holder.addCallback(object : SurfaceHolder.Callback {
-                                        override fun surfaceCreated(holder: SurfaceHolder) {
-                                            nativeEngine.setSurface(holder.surface)
-                                            loadProjectVideo(context, project)
-                                        }
-                                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {}
-                                        override fun surfaceDestroyed(holder: SurfaceHolder) {
-                                            nativeEngine.releaseSurface()
-                                        }
-                                    })
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        // Friendly Warning UI State instead of crashing
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(32.dp)
+                    Text(
+                        text = "Project Assets",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+
+                    Button(
+                        onClick = { selectVideoLauncher.launch(arrayOf("video/*")) },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "Import")
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Import Media")
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (project.assets.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = "Error",
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(64.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "Media File Inaccessible",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "The video file may have been moved, deleted, or its temporary access token expired. Please re-attach the file to resume editing.",
+                                text = "No media imported yet.\nTap 'Import Media' to add video clips.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.Gray,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 16.dp)
+                                textAlign = TextAlign.Center
                             )
+                        }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            items(project.assets) { assetUriString ->
+                                val isSelected = assetUriString == project.videoUri
+                                val assetName = remember(assetUriString) {
+                                    Uri.parse(assetUriString).lastPathSegment ?: "Video Clip"
+                                }
+
+                                Card(
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = if (isSelected) {
+                                            MaterialTheme.colorScheme.primaryContainer
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant
+                                        }
+                                    ),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            // Handle selecting and loading different media assets on tap
+                                            if (isPlaying) {
+                                                nativeEngine.pause()
+                                                isPlaying = false
+                                            }
+                                            val updatedProject = project.copy(videoUri = assetUriString)
+                                            saveProjectToFile(context, updatedProject)
+                                            currentScreen = Screen.Editor(updatedProject)
+                                            loadProjectVideo(context, updatedProject)
+                                        }
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlayArrow,
+                                            contentDescription = "Active asset marker",
+                                            tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray,
+                                            modifier = Modifier.size(24.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Column {
+                                            Text(
+                                                text = assetName,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                maxLines = 1
+                                            )
+                                            Text(
+                                                text = if (isSelected) "Active Preview" else "Tap to preview",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
-                // Interaction / Media Bar
-                Row(
+                // Vertical border divider separating panels
+                VerticalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                // --- PREVIEW WINDOW & TIMELINE/PLAYBACK CONTROLS ---
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
+                        .weight(1f)
+                        .fillMaxHeight()
                 ) {
-                    Button(onClick = {
-                        selectVideoLauncher.launch(arrayOf("video/*"))
-                    }) {
-                        Text(if (project.videoUri != null) "Re-attach Media" else "Attach Media")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .background(Color.Black),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (project.videoUri == null) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "No active media in player",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Color.Gray
+                                )
+                                Text(
+                                    text = "Import and tap a clip in the Asset Panel to preview.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.DarkGray
+                                )
+                            }
+                        } else if (isMediaAccessible) {
+                            AndroidView(
+                                factory = { ctx ->
+                                    SurfaceView(ctx).apply {
+                                        holder.addCallback(object : SurfaceHolder.Callback {
+                                            override fun surfaceCreated(holder: SurfaceHolder) {
+                                                nativeEngine.setSurface(holder.surface)
+                                                loadProjectVideo(context, project)
+                                            }
+                                            override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {}
+                                            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                                                nativeEngine.releaseSurface()
+                                            }
+                                        })
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            // Friendly Warning UI State instead of crashing
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = "Error",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(64.dp)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "Media File Inaccessible",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "The video file may have been moved, deleted, or its temporary access token expired. Please re-attach the file to resume editing.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.Gray,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+                        }
                     }
 
-                    Button(
-                        onClick = {
-                            if (isPlaying) {
-                                nativeEngine.pause()
-                            } else {
-                                nativeEngine.play()
-                            }
-                            isPlaying = !isPlaying
-                        },
-                        enabled = project.videoUri != null && isMediaAccessible
+                    // Bottom Control / Media bar
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(if (isPlaying) "Pause" else "Play")
+                        Button(
+                            onClick = {
+                                if (isPlaying) {
+                                    nativeEngine.pause()
+                                } else {
+                                    nativeEngine.play()
+                                }
+                                isPlaying = !isPlaying
+                            },
+                            enabled = project.videoUri != null && isMediaAccessible,
+                            modifier = Modifier.width(200.dp)
+                        ) {
+                            Text(if (isPlaying) "Pause" else "Play")
+                        }
                     }
                 }
             }
