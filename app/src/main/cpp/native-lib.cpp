@@ -30,10 +30,15 @@ std::thread audioDecodeThread;
 std::atomic<bool> isPlaying(false);
 std::atomic<bool> isThreadRunning(false);
 
+// Decoder state trackers to prevent illegal lifecycle transitions
+std::atomic<bool> isVideoCodecStarted(false);
+std::atomic<bool> isAudioCodecStarted(false);
+
 // A/V Sync Master Clock State
 std::atomic<bool> hasAudio(false);
 std::atomic<int64_t> audioMasterClockUs(0);
 std::atomic<int64_t> firstAudioPtsUs(-1);
+std::atomic<int64_t> resumeFramesRead(0); // Track pre-existing played frames to compute relative timing after a pause
 int32_t audioSampleRate = 44100;
 int32_t audioChannelCount = 2;
 
@@ -55,18 +60,24 @@ void cleanupMedia() {
         audioDecodeThread.join();
     }
 
-    // Stop and delete the video codec
+    // Stop and delete the video codec, checking if it was ever started
     if (videoCodec) {
-        AMediaCodec_stop(videoCodec);
+        if (isVideoCodecStarted) {
+            AMediaCodec_stop(videoCodec);
+            isVideoCodecStarted = false;
+        }
         AMediaCodec_delete(videoCodec);
         videoCodec = nullptr;
     }
 
-    // Stop and delete the audio codec
+    // Stop and delete the audio codec, checking if it was ever started
     if (audioCodec) {
-        AMediaCodec_stop(audioCodec);
+        if (isAudioCodecStarted) {
+            AMediaCodec_stop(audioCodec);
+            isAudioCodecStarted = false;
+        }
         AMediaCodec_delete(audioCodec);
-        audioCodec = nullptr; // FIXED: Corrected typo (was setting videoCodec = nullptr)
+        audioCodec = nullptr;
     }
 
     // Close and destroy the AAudio stream
@@ -89,6 +100,7 @@ void cleanupMedia() {
     hasAudio = false;
     firstAudioPtsUs = -1;
     audioMasterClockUs = 0;
+    resumeFramesRead = 0;
 }
 
 // Helper to safely configure or reconfigure AAudio based on actual decoder formats
@@ -117,6 +129,7 @@ void recreateAudioStream(int32_t sampleRate, int32_t channelCount) {
 
     // Reset the synchronization timestamp baseline so the master clock adjusts cleanly
     firstAudioPtsUs = -1;
+    resumeFramesRead = 0;
 }
 
 // JNI bindings mapped to the verified native package structure 'org.ashwin.opencut'
@@ -145,6 +158,10 @@ Java_org_ashwin_opencut_NativeEngine_setDataSource(JNIEnv* env, jobject, jint fd
     // Duplicate file descriptors so video and audio extractors can scan independently
     int videoFd = dup(fd);
     int audioFd = dup(fd);
+
+    // Reset states
+    isVideoCodecStarted = false;
+    isAudioCodecStarted = false;
 
     // Initialize Video Extractor
     videoExtractor = AMediaExtractor_new();
@@ -214,8 +231,20 @@ Java_org_ashwin_opencut_NativeEngine_play(JNIEnv*, jobject) {
         isPlaying = true;
         isThreadRunning = true;
 
-        if (videoCodec) AMediaCodec_start(videoCodec);
-        if (audioCodec) AMediaCodec_start(audioCodec);
+        // FIXED: Only start hardware codecs if they are not already in an executing state
+        if (videoCodec && !isVideoCodecStarted) {
+            AMediaCodec_start(videoCodec);
+            isVideoCodecStarted = true;
+        }
+        if (audioCodec && !isAudioCodecStarted) {
+            AMediaCodec_start(audioCodec);
+            isAudioCodecStarted = true;
+        }
+
+        // FIXED: Explicitly resume the physical AAudio stream after a pause
+        if (audioStream) {
+            AAudioStream_requestStart(audioStream);
+        }
 
         videoDecodeThread = std::thread(videoDecodeLoop);
         if (hasAudio) {
@@ -234,8 +263,18 @@ Java_org_ashwin_opencut_NativeEngine_pause(JNIEnv*, jobject) {
     if (audioDecodeThread.joinable()) audioDecodeThread.join();
 
     if (audioStream) AAudioStream_requestPause(audioStream);
-    if (videoCodec) AMediaCodec_flush(videoCodec);
-    if (audioCodec) AMediaCodec_flush(audioCodec);
+
+    // Only flush codecs if they are currently active/executing
+    if (videoCodec && isVideoCodecStarted) {
+        AMediaCodec_flush(videoCodec);
+    }
+    if (audioCodec && isAudioCodecStarted) {
+        AMediaCodec_flush(audioCodec);
+    }
+
+    // FIXED: Clear sync values on pause so the clock is safely re-calibrated upon play
+    firstAudioPtsUs = -1;
+    audioMasterClockUs = 0;
 
     LOGI("Engine Playback Paused");
 }
@@ -249,7 +288,6 @@ Java_org_ashwin_opencut_NativeEngine_release(JNIEnv*, jobject) {
 // Native Audio Decoding & Playback Loop
 // ---------------------------------------------------------
 void audioDecodeLoop() {
-    // Thread safety guard: ensure pointers are initialized before running loop
     if (!audioCodec || !audioExtractor) {
         LOGE("Audio components missing during initialization, aborting audio thread.");
         return;
@@ -280,8 +318,14 @@ void audioDecodeLoop() {
         ssize_t status = AMediaCodec_dequeueOutputBuffer(audioCodec, &info, 5000);
 
         if (status >= 0) {
+            // FIXED: Capture the exact hardware frames played prior to this playback segment
             if (firstAudioPtsUs == -1 && info.presentationTimeUs >= 0) {
                 firstAudioPtsUs = info.presentationTimeUs;
+                if (audioStream) {
+                    resumeFramesRead.store(AAudioStream_getFramesRead(audioStream));
+                } else {
+                    resumeFramesRead.store(0);
+                }
             }
 
             size_t outSize;
@@ -294,10 +338,13 @@ void audioDecodeLoop() {
                 // Write PCM buffer directly to AAudio
                 AAudioStream_write(audioStream, pcmBuf, numFrames, 100000000); // 100ms timeout
 
-                // Keep synchronization tracking perfectly calibrated
+                // FIXED: Keep synchronization tracking perfectly calibrated relative to resume offsets
                 int64_t framesRead = AAudioStream_getFramesRead(audioStream);
+                int64_t relativeFrames = framesRead - resumeFramesRead.load();
+                if (relativeFrames < 0) relativeFrames = 0;
+
                 if (firstAudioPtsUs != -1) {
-                    int64_t currentPts = firstAudioPtsUs + (framesRead * 1000000LL / audioSampleRate);
+                    int64_t currentPts = firstAudioPtsUs + (relativeFrames * 1000000LL / audioSampleRate);
                     audioMasterClockUs.store(currentPts);
                 }
             }
@@ -326,7 +373,6 @@ void audioDecodeLoop() {
 // Native Video Decoding & Sync-To-Audio Loop
 // ---------------------------------------------------------
 void videoDecodeLoop() {
-    // Thread safety guard: ensure pointers are initialized before running loop
     if (!videoCodec || !videoExtractor) {
         LOGE("Video components missing during initialization, aborting video thread.");
         return;
