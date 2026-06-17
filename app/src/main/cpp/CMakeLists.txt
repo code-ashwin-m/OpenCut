@@ -23,6 +23,7 @@ find_library(egl-lib EGL)
 find_library(gles-lib GLESv2)
 # NEW: Import native media libraries for C++ decoding
 find_library(mediandk-lib mediandk)
+find_library(aaudio-lib aaudio)
 
 # In this top level CMakeLists.txt, ${CMAKE_PROJECT_NAME} is used to define
 # the target library name; in the sub-module's CMakeLists.txt, ${PROJECT_NAME}
@@ -47,4 +48,5 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         ${android-lib}
         ${egl-lib}
         ${gles-lib}
-        ${mediandk-lib})
+        ${mediandk-lib}
+        ${aaudio-lib})
