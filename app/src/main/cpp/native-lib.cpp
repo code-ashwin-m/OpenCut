@@ -39,6 +39,8 @@ std::atomic<bool> hasAudio(false);
 std::atomic<int64_t> audioMasterClockUs(0);
 std::atomic<int64_t> firstAudioPtsUs(-1);
 std::atomic<int64_t> resumeFramesRead(0); // Track pre-existing played frames to compute relative timing after a pause
+std::atomic<int64_t> currentPlaybackPositionUs(0); // Exposed playhead position
+
 int32_t audioSampleRate = 44100;
 int32_t audioChannelCount = 2;
 
@@ -101,6 +103,7 @@ void cleanupMedia() {
     firstAudioPtsUs = -1;
     audioMasterClockUs = 0;
     resumeFramesRead = 0;
+    currentPlaybackPositionUs = 0;
 }
 
 // Helper to safely configure or reconfigure AAudio based on actual decoder formats
@@ -284,6 +287,12 @@ Java_org_ashwin_opencut_NativeEngine_release(JNIEnv*, jobject) {
     cleanupMedia();
 }
 
+// JNI method to query the smooth master clock timeline coordinates directly from Kotlin UI
+extern "C" JNIEXPORT jlong JNICALL
+Java_org_ashwin_opencut_NativeEngine_getCurrentPositionUs(JNIEnv*, jobject) {
+    return currentPlaybackPositionUs.load();
+}
+
 // ---------------------------------------------------------
 // Native Audio Decoding & Playback Loop
 // ---------------------------------------------------------
@@ -318,7 +327,7 @@ void audioDecodeLoop() {
         ssize_t status = AMediaCodec_dequeueOutputBuffer(audioCodec, &info, 5000);
 
         if (status >= 0) {
-            // FIXED: Capture the exact hardware frames played prior to this playback segment
+            // Capture the exact hardware frames played prior to this playback segment
             if (firstAudioPtsUs == -1 && info.presentationTimeUs >= 0) {
                 firstAudioPtsUs = info.presentationTimeUs;
                 if (audioStream) {
@@ -338,7 +347,7 @@ void audioDecodeLoop() {
                 // Write PCM buffer directly to AAudio
                 AAudioStream_write(audioStream, pcmBuf, numFrames, 100000000); // 100ms timeout
 
-                // FIXED: Keep synchronization tracking perfectly calibrated relative to resume offsets
+                // Keep synchronization tracking perfectly calibrated relative to resume offsets
                 int64_t framesRead = AAudioStream_getFramesRead(audioStream);
                 int64_t relativeFrames = framesRead - resumeFramesRead.load();
                 if (relativeFrames < 0) relativeFrames = 0;
@@ -346,6 +355,7 @@ void audioDecodeLoop() {
                 if (firstAudioPtsUs != -1) {
                     int64_t currentPts = firstAudioPtsUs + (relativeFrames * 1000000LL / audioSampleRate);
                     audioMasterClockUs.store(currentPts);
+                    currentPlaybackPositionUs.store(currentPts); // Stream position coordinates
                 }
             }
             AMediaCodec_releaseOutputBuffer(audioCodec, status, false);
@@ -437,6 +447,7 @@ void videoDecodeLoop() {
                         std::this_thread::sleep_for(std::chrono::microseconds(sleepTimeUs));
                     }
                 }
+                currentPlaybackPositionUs.store(framePts); // Stream system position coordinates if silent
             }
 
             // Release frame to Surface for rendering
