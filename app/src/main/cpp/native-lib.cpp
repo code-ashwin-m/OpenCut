@@ -66,7 +66,7 @@ void cleanupMedia() {
     if (audioCodec) {
         AMediaCodec_stop(audioCodec);
         AMediaCodec_delete(audioCodec);
-        videoCodec = nullptr;
+        audioCodec = nullptr; // FIXED: Corrected typo (was setting videoCodec = nullptr)
     }
 
     // Close and destroy the AAudio stream
@@ -119,6 +119,7 @@ void recreateAudioStream(int32_t sampleRate, int32_t channelCount) {
     firstAudioPtsUs = -1;
 }
 
+// JNI bindings mapped to the verified native package structure 'org.ashwin.opencut'
 extern "C" JNIEXPORT void JNICALL
 Java_org_ashwin_opencut_NativeEngine_setSurface(JNIEnv* env, jobject, jobject surface) {
     if (nativeWindow) {
@@ -248,6 +249,12 @@ Java_org_ashwin_opencut_NativeEngine_release(JNIEnv*, jobject) {
 // Native Audio Decoding & Playback Loop
 // ---------------------------------------------------------
 void audioDecodeLoop() {
+    // Thread safety guard: ensure pointers are initialized before running loop
+    if (!audioCodec || !audioExtractor) {
+        LOGE("Audio components missing during initialization, aborting audio thread.");
+        return;
+    }
+
     bool isEOS = false;
 
     while (isThreadRunning) {
@@ -296,7 +303,6 @@ void audioDecodeLoop() {
             }
             AMediaCodec_releaseOutputBuffer(audioCodec, status, false);
         } else if (status == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
-            // CRITICAL: The decoder has announced its actual decoded output format!
             AMediaFormat* format = AMediaCodec_getOutputFormat(audioCodec);
             int32_t actualSampleRate = audioSampleRate;
             int32_t actualChannelCount = audioChannelCount;
@@ -307,7 +313,6 @@ void audioDecodeLoop() {
 
             LOGI("Audio Decoder format confirmed: Rate: %d, Channels: %d", actualSampleRate, actualChannelCount);
 
-            // Instantly spin up or adjust the AAudio stream to match the verified parameters
             if (actualSampleRate != audioSampleRate || actualChannelCount != audioChannelCount || !audioStream) {
                 audioSampleRate = actualSampleRate;
                 audioChannelCount = actualChannelCount;
@@ -321,6 +326,12 @@ void audioDecodeLoop() {
 // Native Video Decoding & Sync-To-Audio Loop
 // ---------------------------------------------------------
 void videoDecodeLoop() {
+    // Thread safety guard: ensure pointers are initialized before running loop
+    if (!videoCodec || !videoExtractor) {
+        LOGE("Video components missing during initialization, aborting video thread.");
+        return;
+    }
+
     bool isEOS = false;
 
     auto systemStartTime = std::chrono::steady_clock::now();
@@ -369,7 +380,7 @@ void videoDecodeLoop() {
                     }
                 }
             } else {
-                // 2. High-precision system clock fallback (if video is silent/has no audio track or clock is starting)
+                // 2. High-precision system clock fallback (if video is silent or clock is starting)
                 auto now = std::chrono::steady_clock::now();
                 int64_t elapsedRealTimeUs = std::chrono::duration_cast<std::chrono::microseconds>(now - systemStartTime).count();
                 int64_t targetElapsedUs = framePts - firstVideoPts;
