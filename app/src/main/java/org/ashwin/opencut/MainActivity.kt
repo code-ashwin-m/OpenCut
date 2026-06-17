@@ -115,6 +115,7 @@ class MainActivity : ComponentActivity() {
                     }
 
                     saveProjectToFile(this@MainActivity, updatedProject)
+                    syncProjectToNative(updatedProject)
                     currentScreen = Screen.Editor(updatedProject)
                     refreshProjectsList(this@MainActivity)
 
@@ -172,7 +173,17 @@ class MainActivity : ComponentActivity() {
 
     private fun openProject(project: Project) {
         isMediaAccessible = true
+        syncProjectToNative(project)
         currentScreen = Screen.Editor(project)
+    }
+
+    // Pushes the logical structure down to the C++ core
+    private fun syncProjectToNative(project: Project) {
+        nativeEngine.initProjectState(project.id, project.name, project.createdAt, project.aspectRatio)
+        project.assets.forEach { nativeEngine.addAssetToProject(it) }
+        project.timelineClips.forEach {
+            nativeEngine.addTimelineClip(it.id, it.assetUri, it.name, it.durationMs)
+        }
     }
 
     private fun loadProjectVideo(context: Context, project: Project) {
@@ -192,13 +203,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Safely extract the video clip's duration in milliseconds using MediaMetadataRetriever
     private fun getVideoDurationMs(context: Context, uriString: String): Long {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(context, Uri.parse(uriString))
             val time = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-            time?.toLong() ?: 5000L // Default fallback to 5 seconds if query fails
+            time?.toLong() ?: 5000L // Default fallback
         } catch (e: Exception) {
             e.printStackTrace()
             5000L
@@ -207,7 +217,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // --- Local JSON Storage Helpers ---
     private fun getProjectsFolder(context: Context): File {
         val folder = File(context.getExternalFilesDir(null), "projects")
         if (!folder.exists()) {
@@ -230,7 +239,6 @@ class MainActivity : ComponentActivity() {
                 project.assets.forEach { assetsArray.put(it) }
                 put("assets", assetsArray)
 
-                // Serialize Timeline Clips
                 val timelineArray = JSONArray()
                 project.timelineClips.forEach { clip ->
                     val clipJson = JSONObject().apply {
@@ -273,7 +281,6 @@ class MainActivity : ComponentActivity() {
                     assetsList.add(videoUri)
                 }
 
-                // Deserialize Timeline Clips
                 val timelineClipsList = mutableListOf<TimelineClip>()
                 if (json.has("timelineClips")) {
                     val arr = json.getJSONArray("timelineClips")
@@ -492,7 +499,6 @@ class MainActivity : ComponentActivity() {
     fun EditorScreen(project: Project, onBackToProjects: () -> Unit) {
         val context = LocalContext.current
 
-        // 60FPS Microsecond Clock synchronization loop
         var currentPlayheadUs by remember { mutableStateOf(0L) }
         LaunchedEffect(isPlaying) {
             if (isPlaying) {
@@ -520,7 +526,6 @@ class MainActivity : ComponentActivity() {
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
-                // Top Half Split View: Asset Panel on Left, Previewer on Right
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -603,11 +608,11 @@ class MainActivity : ComponentActivity() {
                                                     }
                                                     val updatedProject = project.copy(videoUri = assetUriString)
                                                     saveProjectToFile(context, updatedProject)
+                                                    syncProjectToNative(updatedProject)
                                                     currentScreen = Screen.Editor(updatedProject)
                                                     loadProjectVideo(context, updatedProject)
                                                 },
                                                 onDoubleClick = {
-                                                    // On double click, calculate metadata duration and append to timeline track
                                                     val duration = getVideoDurationMs(context, assetUriString)
                                                     val newClip = TimelineClip(
                                                         id = System.currentTimeMillis().toString(),
@@ -623,6 +628,7 @@ class MainActivity : ComponentActivity() {
                                                         videoUri = project.videoUri ?: assetUriString
                                                     )
                                                     saveProjectToFile(context, updatedProject)
+                                                    syncProjectToNative(updatedProject)
                                                     currentScreen = Screen.Editor(updatedProject)
                                                     refreshProjectsList(context)
                                                 }
@@ -764,7 +770,6 @@ class MainActivity : ComponentActivity() {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 // --- SINGLE TRACK TIMELINE PANEL ---
-                // FIXED: Decreased from 240.dp to 180.dp to prevent pushing off the viewport on landscape layouts
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -772,7 +777,6 @@ class MainActivity : ComponentActivity() {
                         .background(MaterialTheme.colorScheme.surfaceColorAtElevation(0.5.dp))
                         .padding(top = 8.dp)
                 ) {
-                    // Timeline Metadata Header
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -797,6 +801,7 @@ class MainActivity : ComponentActivity() {
                                 onClick = {
                                     val updatedProject = project.copy(timelineClips = emptyList())
                                     saveProjectToFile(context, updatedProject)
+                                    syncProjectToNative(updatedProject)
                                     currentScreen = Screen.Editor(updatedProject)
                                     refreshProjectsList(context)
                                 },
@@ -811,7 +816,6 @@ class MainActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Horizontal Scroll Track Area
                     val timelineScrollState = rememberScrollState()
                     Box(
                         modifier = Modifier
@@ -820,12 +824,8 @@ class MainActivity : ComponentActivity() {
                             .background(Color(0xFF1E1E1E))
                             .horizontalScroll(timelineScrollState)
                     ) {
-                        // Drawing variables: 1 second = 40.dp density
                         val dpPerSec = 40.dp
-
                         val totalDurationMs = project.timelineClips.sumOf { it.durationMs }
-                        // FIXED: Replaced standard Double evaluation to ensure compiler safety across toolchains
-                        // Also, guaranteed that timeline track spans at least 1200.dp so ruler ticks don't collapse on screen setup
                         val trackWidth = maxOf((totalDurationMs * 0.04f).dp, 1200.dp)
 
                         Box(
@@ -853,7 +853,6 @@ class MainActivity : ComponentActivity() {
                                 }
                         ) {
                             Column(modifier = Modifier.fillMaxSize()) {
-                                // Time Ruler ticks
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -861,7 +860,7 @@ class MainActivity : ComponentActivity() {
                                         .background(Color.Black.copy(alpha = 0.3f)),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    val tickCount = maxOf((totalDurationMs / 1000).toInt(), 30) // Render at least 30 ticks for default screen width span
+                                    val tickCount = maxOf((totalDurationMs / 1000).toInt(), 30)
                                     for (i in 0..tickCount) {
                                         Box(
                                             modifier = Modifier
@@ -885,7 +884,6 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
 
-                                // Single Sequential Track Row Container
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -914,9 +912,7 @@ class MainActivity : ComponentActivity() {
 
                                             Card(
                                                 shape = RoundedCornerShape(4.dp),
-                                                colors = CardDefaults.cardColors(
-//                                                    containerColor = MaterialTheme.copy(colorScheme = darkColorScheme()).colorScheme.primaryContainer.copy(alpha = 0.85f)
-                                                ),
+                                                colors = CardDefaults.cardColors(),
                                                 modifier = Modifier
                                                     .width(clipWidth)
                                                     .fillMaxHeight()
@@ -968,9 +964,15 @@ class NativeEngine {
         System.loadLibrary("opencut")
     }
 
+    // --- State Synchronization (Pushes Kotlin domain states into C++) ---
+    external fun initProjectState(id: String, name: String, createdAt: Long, aspectRatio: String)
+    external fun addAssetToProject(assetUri: String)
+    external fun addTimelineClip(id: String, assetUri: String, name: String, durationMs: Long)
+
+    // --- Hardware & Playback Linkage ---
     external fun setSurface(surface: Surface)
     external fun releaseSurface()
-    external fun setDataSource(fd: Int)
+    external fun setDataSource(fd: Int) // Android specific. iOS will use setDataSourcePath()
     external fun play()
     external fun pause()
     external fun release()
