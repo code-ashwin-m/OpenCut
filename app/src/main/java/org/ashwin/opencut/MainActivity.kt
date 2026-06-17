@@ -1,75 +1,131 @@
 package org.ashwin.opencut
 
+
 import android.net.Uri
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
+import android.view.Surface
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import org.ashwin.opencut.ui.VideoPreviewView
+import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
 
-    private lateinit var previewView: VideoPreviewView
+    private val nativeEngine = NativeEngine()
+    private var isPlaying by mutableStateOf(false)
+    private var videoLoaded by mutableStateOf(false)
+
+    // Hold onto the FD to prevent it from being garbage collected while C++ uses it
+    private var currentFd: ParcelFileDescriptor? = null
+
+    private val selectVideoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+
+        uri?.let {
+            try {
+                // Get a File Descriptor from the content URI
+                currentFd?.close()
+                currentFd = contentResolver.openFileDescriptor(it, "r")
+
+                currentFd?.let { pfd ->
+                    // Pass the raw integer file descriptor to C++
+                    nativeEngine.setDataSource(pfd.fd)
+                    videoLoaded = true
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        previewView = VideoPreviewView(this)
-
         setContent {
-            EditorScreen(previewView)
+            MaterialTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    EditorUI()
+                }
+            }
         }
+    }
 
-        val uri = Uri.parse("android.resource://${packageName}/${R.raw.sample}")
+    @Composable
+    fun EditorUI() {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                AndroidView(
+                    factory = { ctx ->
+                        SurfaceView(ctx).apply {
+                            holder.addCallback(object : SurfaceHolder.Callback {
+                                override fun surfaceCreated(holder: SurfaceHolder) {
+                                    nativeEngine.setSurface(holder.surface)
+                                }
+                                override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {}
+                                override fun surfaceDestroyed(holder: SurfaceHolder) {
+                                    nativeEngine.releaseSurface()
+                                }
+                            })
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
-        previewView.loadVideo(uri)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                Button(onClick = { selectVideoLauncher.launch("video/*") }) {
+                    Text("Select Video")
+                }
+
+                Button(
+                    onClick = {
+                        if (isPlaying) nativeEngine.pause() else nativeEngine.play()
+                        isPlaying = !isPlaying
+                    },
+                    enabled = videoLoaded
+                ) {
+                    Text(if (isPlaying) "Pause" else "Play")
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        nativeEngine.release()
+        currentFd?.close()
     }
 }
 
-@Composable
-fun EditorScreen(
-    previewView: VideoPreviewView
-) {
-    var brightness by remember { mutableFloatStateOf(0f) }
-
-    Column (
-        modifier = Modifier.fillMaxSize()
-    ) {
-        AndroidView(
-            factory = { previewView },
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        )
-
-        Text(
-            text = "Brightness: $brightness",
-            color = Color.White,
-            modifier = Modifier.padding(16.dp)
-        )
-
-        Slider(
-            value = brightness,
-            onValueChange = {
-                brightness = it
-                previewView.setBrightness(brightness)
-            },
-            valueRange = -1f..1f,
-            modifier = Modifier.padding(16.dp)
-        )
+// Thin JNI Wrapper
+class NativeEngine {
+    init {
+        System.loadLibrary("opencut")
     }
+
+    external fun setSurface(surface: Surface)
+    external fun releaseSurface()
+    external fun setDataSource(fd: Int) // Passing the FD instead of a Path!
+    external fun play()
+    external fun pause()
+    external fun release()
 }
